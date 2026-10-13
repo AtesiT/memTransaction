@@ -1,0 +1,6 @@
+# результаты сборки MAUI
+bin/
+obj/
+*.user
+*.suo
+.vs/
