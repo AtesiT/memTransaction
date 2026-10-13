@@ -2,7 +2,7 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
-  <!-- Палитра тёмной темы (та же, что на веб-стенде) -->
+  <!-- Тёмная тема приложения -->
   <Color x:Key="PageBackground">#070b16</Color>
   <Color x:Key="CardBackground">#0c1224</Color>
   <Color x:Key="PanelBackground">#111a30</Color>
