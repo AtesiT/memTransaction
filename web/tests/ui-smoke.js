@@ -114,6 +114,13 @@ function makeDom() {
     if (name === 'normal') c.classList.add('active');
     return c;
   });
+  queryGroups['.panel-switch .chip'] = ['workers', 'timeline', 'journal'].map(function (name) {
+    var c = makeElement('panel-chip-' + name, 'button');
+    c.setAttribute('data-panel', name);
+    c.classList.add('chip');
+    if (name === 'workers') c.classList.add('active');
+    return c;
+  });
   queryGroups['.journal-switch .chip'] = ['events', 'worker'].map(function (name) {
     var c = makeElement('journal-' + name, 'button');
     c.setAttribute('data-journal', name);
@@ -284,7 +291,37 @@ async function main() {
     clean($('inv-body').innerHTML || $('inv-body').textContent));
   expect('схема очищена', sandbox.STMLab.network.coins.length === 0 && sandbox.STMLab.network.sent === 0);
 
-  // ================= 7. Журнал выбранного потока ==========================
+  // ================= 7. Мобильная раскладка (как в MAUI) ==================
+  console.log('\n=== Мобильная раскладка (телефон) ===');
+  sandbox.STMLab.viewport(390);
+  expect('включился мобильный режим', document.body.classList.contains('mobile'));
+  expect('параметры свёрнуты, чтобы не занимать экран', $('params').open === false);
+  expect('видна одна панель — «Потоки»',
+    !$('panel-workers').classList.contains('m-hidden') &&
+    $('panel-timeline').classList.contains('m-hidden') &&
+    $('panel-journal').classList.contains('m-hidden'));
+
+  sandbox.STMLab.panel('timeline');
+  expect('переключатель показывает таймлайн',
+    $('panel-timeline').classList.contains('m-hidden') === false &&
+    $('panel-workers').classList.contains('m-hidden'));
+
+  sandbox.STMLab.panel('journal');
+  expect('переключатель показывает журнал',
+    $('panel-journal').classList.contains('m-hidden') === false);
+
+  var chipsMobile = document.querySelectorAll('.panel-switch .chip');
+  expect('три панели переключаются по одной', chipsMobile.length === 3);
+
+  sandbox.STMLab.viewport(1280);
+  expect('на широком экране видно всё сразу',
+    !document.body.classList.contains('mobile') &&
+    !$('panel-workers').classList.contains('m-hidden') &&
+    !$('panel-timeline').classList.contains('m-hidden') &&
+    !$('panel-journal').classList.contains('m-hidden'));
+  expect('на широком экране параметры раскрываются', $('params').open === true);
+
+  // ================= 8. Журнал выбранного потока ==========================
   console.log('\n=== Журнал ===');
   var journalChips = document.querySelectorAll('.journal-switch .chip');
   journalChips[1].dispatch('click');                 // переключаемся на «поток»

@@ -30,67 +30,69 @@
 
 <main class="layout">
 
-  <!-- ===================== ПАРАМЕТРЫ И ПОКАЗАТЕЛИ ===================== -->
+  <!-- ===================== ПАРАМЕТРЫ ===================== -->
   <aside class="panel controls">
-    <h2>Параметры запуска</h2>
+    <details class="params" id="params" open>
+      <summary>Параметры запуска</summary>
 
-    <div class="field">
-      <label class="lbl">Сценарий синхронизации</label>
-      <div class="chips" id="technique-chips"></div>
-      <p class="hint" id="technique-hint"></p>
-    </div>
-
-    <div class="field">
-      <label class="lbl">Темп показа</label>
-      <div class="chips" id="tempo-chips">
-        <button class="chip" data-tempo="show" title="Медленно: каждый перевод видно по отдельности">🐢 показ</button>
-        <button class="chip active" data-tempo="normal" title="Обычный темп для наблюдения">▶ обычный</button>
-        <button class="chip" data-tempo="load" title="Много операций в секунду: видно конкуренцию и всплеск откатов">⚡ нагрузка</button>
-      </div>
-    </div>
-
-    <div class="field">
-      <label class="lbl" for="workers">Потоков: <b id="workers-val">8</b></label>
-      <input type="range" id="workers" min="2" max="16" step="1" value="8">
-    </div>
-
-    <details class="fine">
-      <summary>Тонкая настройка</summary>
-
-      <div class="field" id="field-work">
-        <label class="lbl" for="work">Работа внутри транзакции: <b id="work-val">320</b> мкс</label>
-        <input type="range" id="work" min="0" max="3000" step="20" value="320">
-        <p class="hint">Аналог <code>Thread.SpinWait()</code>: чем дольше транзакция «думает», тем больше конфликтов.</p>
+      <div class="field">
+        <label class="lbl">Сценарий синхронизации</label>
+        <div class="chips" id="technique-chips"></div>
+        <p class="hint" id="technique-hint"></p>
       </div>
 
       <div class="field">
-        <label class="lbl" for="gap">Пауза между операциями: <b id="gap-val">80</b> мс</label>
-        <input type="range" id="gap" min="0" max="600" step="10" value="80">
+        <label class="lbl">Темп показа</label>
+        <div class="chips" id="tempo-chips">
+          <button class="chip" data-tempo="show" title="Медленно: каждый перевод видно по отдельности">🐢 показ</button>
+          <button class="chip active" data-tempo="normal" title="Обычный темп для наблюдения">▶ обычный</button>
+          <button class="chip" data-tempo="load" title="Много операций в секунду: видно конкуренцию и всплеск откатов">⚡ нагрузка</button>
+        </div>
       </div>
 
-      <div class="field" id="field-speed">
-        <label class="lbl" for="speed">Скорость симулятора: <b id="speed-val">3</b> шага/такт</label>
-        <input type="range" id="speed" min="1" max="10" step="1" value="3">
+      <div class="field">
+        <label class="lbl" for="workers">Потоков: <b id="workers-val">8</b></label>
+        <input type="range" id="workers" min="2" max="16" step="1" value="8">
       </div>
 
-      <label class="check">
-        <input type="checkbox" id="boost" checked>
-        <span>Агрессивные конфликты (разброс времени транзакции)</span>
-      </label>
+      <details class="fine">
+        <summary>Тонкая настройка</summary>
+
+        <div class="field" id="field-work">
+          <label class="lbl" for="work">Работа внутри транзакции: <b id="work-val">320</b> мкс</label>
+          <input type="range" id="work" min="0" max="3000" step="20" value="320">
+          <p class="hint">Аналог <code>Thread.SpinWait()</code>: чем дольше транзакция «думает», тем больше конфликтов.</p>
+        </div>
+
+        <div class="field">
+          <label class="lbl" for="gap">Пауза между операциями: <b id="gap-val">80</b> мс</label>
+          <input type="range" id="gap" min="0" max="600" step="10" value="80">
+        </div>
+
+        <div class="field" id="field-speed">
+          <label class="lbl" for="speed">Скорость симулятора: <b id="speed-val">3</b> шага/такт</label>
+          <input type="range" id="speed" min="1" max="10" step="1" value="3">
+        </div>
+
+        <label class="check">
+          <input type="checkbox" id="boost" checked>
+          <span>Агрессивные конфликты (разброс времени транзакции)</span>
+        </label>
+      </details>
+
+      <div class="buttons">
+        <button id="btn-start" class="btn btn-primary">▶ Запустить</button>
+        <button id="btn-pause" class="btn" disabled>⏸ Пауза</button>
+        <button id="btn-reset" class="btn">⟲ Сброс</button>
+      </div>
     </details>
-
-    <div class="buttons">
-      <button id="btn-start" class="btn btn-primary">▶ Запустить</button>
-      <button id="btn-pause" class="btn" disabled>⏸ Пауза</button>
-      <button id="btn-reset" class="btn">⟲ Сброс</button>
-    </div>
 
     <h2 class="mt">Показатели</h2>
     <div class="metrics">
       <div class="metric"><span>Операций</span><b id="m-ops">0</b></div>
       <div class="metric"><span>Коммитов</span><b id="m-commits">0</b></div>
-      <div class="metric"><span>Откатов (конфликт)</span><b id="m-retries" class="warn">0</b></div>
-      <div class="metric" id="metric-aborts"><span>Отказов (нет средств)</span><b id="m-aborts">0</b></div>
+      <div class="metric"><span>Откатов</span><b id="m-retries" class="warn">0</b></div>
+      <div class="metric" id="metric-aborts"><span>Отказов</span><b id="m-aborts">0</b></div>
       <div class="metric"><span>Операций/сек</span><b id="m-rate">0</b></div>
       <div class="metric"><span>Эффективность</span><b id="m-efficiency">—</b></div>
     </div>
@@ -111,13 +113,20 @@
       <p class="hint" id="net-hint"></p>
     </div>
 
+    <!-- Переключатель панелей для узких экранов (телефон / MAUI) -->
+    <div class="panel-switch" id="panel-switch">
+      <button class="chip active" data-panel="workers">Потоки</button>
+      <button class="chip" data-panel="timeline">Таймлайн</button>
+      <button class="chip" data-panel="journal">Журнал</button>
+    </div>
+
     <div class="grid">
-      <div class="panel">
+      <div class="panel" id="panel-workers">
         <h2>Состояние потоков <span class="tag">из общей памяти</span></h2>
         <div class="workers" id="workers-grid"></div>
       </div>
 
-      <div class="panel">
+      <div class="panel" id="panel-timeline">
         <h2>Таймлайн транзакций <span class="tag">попытка = рамка</span></h2>
         <canvas id="timeline" height="210"></canvas>
         <div class="legend">
@@ -131,7 +140,7 @@
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel" id="panel-journal">
       <h2>Журнал <span class="tag" id="events-count">0</span>
         <span class="journal-switch">
           <button class="chip chip-sm active" data-journal="events">транзакции</button>
@@ -160,9 +169,10 @@
 </main>
 
 <footer class="foot">
-  <span>Код на C# по обоим примерам и заготовка для .NET MAUI — в файле
-    <a href="docs/csharp-tm.md">web/docs/csharp-tm.md</a>. Как запускать и проверять —
-    <a href="README.md">web/README.md</a>.</span>
+  <span>Код на C# по обоим примерам и заготовка для .NET MAUI — в
+    <a href="docs/csharp-tm.md">docs/csharp-tm.md</a>,
+    план экрана мобильного приложения — в <a href="docs/maui-plan.md">docs/maui-plan.md</a>,
+    что и как показывать на защите — в <a href="docs/zashchita.md">docs/zashchita.md</a>.</span>
 </footer>
 
 <script src="js/tm-core.js"></script>

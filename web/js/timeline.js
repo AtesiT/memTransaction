@@ -40,15 +40,14 @@
 
   Timeline.prototype.resize = function () {
     var rect = this.canvas.getBoundingClientRect();
-    var h = this.canvas.height / (this.dpr * (this._scaled || 1)) || 260;
-    // height задан в HTML-атрибуте, поэтому запоминаем логическую высоту один раз
-    if (!this._logicalH) this._logicalH = Number(this.canvas.getAttribute('height')) || 260;
     this.w = Math.max(300, rect.width);
-    this.h = this._logicalH;
+    // Высоту считаем от ширины: на телефоне таймлайн компактнее.
+    var base = this.baseHeight || Number(this.canvas.getAttribute('height')) || 210;
+    this.baseHeight = base;
+    this.h = this.w < 560 ? Math.round(base * 0.8) : base;
     this.canvas.width = Math.round(this.w * this.dpr);
     this.canvas.height = Math.round(this.h * this.dpr);
     this.canvas.style.height = this.h + 'px';
-    this._scaled = 1;
     this.ctx2d.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
   };
 

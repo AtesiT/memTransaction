@@ -73,6 +73,8 @@
     lastOpsAt: 0,
     rate: 0,
     selectedPid: 0,
+    mobile: false,
+    mobilePanel: 'workers',
     invBadSince: 0,
     eventsSeen: 0,
     dropped: false
@@ -90,6 +92,63 @@
   // -------------------------------------------------------------------------
   // Вкладки и сценарии
   // -------------------------------------------------------------------------
+
+  // -------------------------------------------------------------------------
+  // Раскладка: на широком экране всё видно сразу, на узком (телефон, MAUI) —
+  // схема сверху, а «Потоки / Таймлайн / Журнал» показываются по одной.
+  // -------------------------------------------------------------------------
+  var MOBILE_BREAKPOINT = 900;
+
+  function setViewport(width) {
+    var mobile = width <= MOBILE_BREAKPOINT;
+    if (mobile !== S.mobile) {
+      S.mobile = mobile;
+      document.body.classList.toggle('mobile', mobile);
+      var paramsBox = $('params');
+      if (paramsBox) paramsBox.open = !mobile;    // на телефоне параметры свёрнуты
+    }
+    applyPanelVisibility();
+    if (network) network.resize();
+    if (timeline) timeline.resize();
+  }
+
+  function setMobilePanel(name) {
+    S.mobilePanel = name;
+    applyPanelVisibility();
+  }
+
+  function applyPanelVisibility() {
+    var panels = ['workers', 'timeline', 'journal'];
+    for (var i = 0; i < panels.length; i++) {
+      var el = $('panel-' + panels[i]);
+      if (!el) continue;
+      var hide = S.mobile && panels[i] !== S.mobilePanel;
+      el.classList.toggle('m-hidden', hide);
+    }
+    var chips = document.querySelectorAll('.panel-switch .chip');
+    for (var k = 0; k < chips.length; k++) {
+      chips[k].classList.toggle('active', chips[k].getAttribute('data-panel') === S.mobilePanel);
+    }
+  }
+
+  function setupPanelSwitch() {
+    var chips = document.querySelectorAll('.panel-switch .chip');
+    for (var i = 0; i < chips.length; i++) {
+      (function (chip) {
+        chip.addEventListener('click', function () { setMobilePanel(chip.getAttribute('data-panel')); });
+      })(chips[i]);
+    }
+  }
+
+  function watchViewport() {
+    setViewport(typeof window.innerWidth === 'number' ? window.innerWidth : 1280);
+    if (typeof window.addEventListener === 'function') {
+      window.addEventListener('resize', function () {
+        setViewport(typeof window.innerWidth === 'number' ? window.innerWidth : 1280);
+      });
+    }
+  }
+
 
   // -------------------------------------------------------------------------
   // Темп показа: «медленно и наглядно» ↔ «нагрузка»
@@ -834,12 +893,16 @@
       get network() { return network; },
       get timeline() { return timeline; },
       tempo: function (name) { applyTempo(name); },
+      viewport: function (width) { setViewport(width); },
+      panel: function (name) { setMobilePanel(name); },
       start: function () { startRun(); },
       reset: function () { stopRun(); clearAll(); }
     };
     setupTabs();
+    setupPanelSwitch();
     setupControls();
     applyDemo('demo1', false);
+    watchViewport();
     buildWorkerGrid();
     updateInvariant(null);
 

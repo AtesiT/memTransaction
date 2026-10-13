@@ -48,6 +48,10 @@
   NetworkView.prototype.resize = function () {
     var rect = this.canvas.getBoundingClientRect();
     this.w = Math.max(320, rect.width);
+    // На телефоне схему делаем ниже, чтобы панели ниже тоже влезали в экран.
+    var base = this.baseHeight || Number(this.canvas.getAttribute('height')) || 360;
+    this.baseHeight = base;
+    this.logicalH = this.w < 560 ? Math.round(base * 0.82) : base;
     this.h = this.logicalH;
     this.canvas.width = Math.round(this.w * this.dpr);
     this.canvas.height = Math.round(this.h * this.dpr);
