@@ -55,6 +55,11 @@ public partial class MainPage : ContentPage
     private double _rate;
     private long _invariantBadSince;
 
+    // раскладка: узкое окно — одна колонка со прокруткой, широкое — две колонки
+    private bool _wideLayout;
+    private double _layoutWidth = -1;
+    private double _layoutHeight = -1;
+
     private sealed class LogLine
     {
         public string Text { get; init; } = string.Empty;
@@ -74,6 +79,7 @@ public partial class MainPage : ContentPage
 
         BuildWorkerCards();
         ApplyDemoUi();
+        UpdateSpeedLabels();
         ResetVisuals();
     }
 
@@ -87,6 +93,86 @@ public partial class MainPage : ContentPage
 
         _timer ??= CreateTimer();
         _timer.Start();
+    }
+
+    /// <summary>
+    /// Окно изменило размер — подстраиваем раскладку. Вызывается и при первом
+    /// показе страницы, поэтому начальная раскладка тоже задаётся здесь.
+    /// </summary>
+    protected override void OnSizeAllocated(double width, double height)
+    {
+        base.OnSizeAllocated(width, height);
+
+        if (width <= 0 || height <= 0)
+            return;
+
+        // мелкие изменения игнорируем, чтобы не дёргать раскладку на каждый пиксель
+        if (Math.Abs(width - _layoutWidth) < 16 && Math.Abs(height - _layoutHeight) < 16)
+            return;
+
+        _layoutWidth = width;
+        _layoutHeight = height;
+        ApplyAdaptiveLayout(width, height);
+    }
+
+    /// <summary>
+    /// Адаптивная раскладка.
+    ///
+    /// Широкое окно (планшет, компьютер): две колонки — слева настройки,
+    /// показатели, инвариант и кнопки, справа схема и панели. Всё помещается
+    /// в экран, прокрутка не нужна.
+    ///
+    /// Узкое окно (телефон): одна колонка, схема сверху — как в мобильной
+    /// вёрстке веб-стенда. Прокрутка есть, но пользоваться ею почти не придётся,
+    /// потому что высота схемы считается от высоты окна.
+    /// </summary>
+    private void ApplyAdaptiveLayout(double width, double height)
+    {
+        bool wide = width >= 860;
+
+        // схема — главный элемент: примерно 40–50 % высоты окна
+        SchemeSection.HeightRequest = Math.Clamp(height * (wide ? 0.46 : 0.36), 200, 520);
+        PanelHost.HeightRequest = Math.Clamp(height * (wide ? 0.30 : 0.22), 130, 280);
+
+        if (wide == _wideLayout && PageRoot.ColumnDefinitions.Count > 0)
+            return;                                   // колонки уже расставлены
+
+        _wideLayout = wide;
+
+        PageRoot.ColumnDefinitions.Clear();
+        if (wide)
+        {
+            PageRoot.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            PageRoot.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
+        }
+        else
+        {
+            PageRoot.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
+        }
+
+        // элементы одни и те же — переносим их между колонками, состояние сохраняется
+        Grid.SetColumn(LeftStack, 0);
+        Grid.SetColumn(RightStack, wide ? 1 : 0);      // при одной колонке — тоже 0, иначе Grid ругается
+
+        LeftStack.Children.Clear();
+        RightStack.Children.Clear();
+        RightStack.IsVisible = wide;
+        LeftStack.WidthRequest = wide ? 380 : -1;
+
+        View[] left = wide
+            ? new View[] { DemoSwitchPanel, ParamsBlock, MetricsPanel, InvariantPanel, ControlsBlock }
+            : new View[] { DemoSwitchPanel, ParamsBlock, SchemeSection, MetricsPanel, InvariantPanel,
+                           PanelSwitchPanel, PanelHost, ControlsBlock };
+
+        View[] right = wide
+            ? new View[] { SchemeSection, PanelSwitchPanel, PanelHost }
+            : Array.Empty<View>();
+
+        foreach (var section in left)
+            LeftStack.Children.Add(section);
+
+        foreach (var section in right)
+            RightStack.Children.Add(section);
     }
 
     protected override void OnDisappearing()
@@ -132,6 +218,10 @@ public partial class MainPage : ContentPage
 
         if (_activePanel == "journal")
             RenderJournal();
+
+        // Монетки летят тем медленнее, чем медленнее выбранный темп:
+        // на «показе» успеваешь разглядеть каждый перевод.
+        _network.FlightScale = Math.Clamp(GapSlider.Value / 300.0, 0.5, 2.4);
 
         _network.Workers = _workers;
         _network.Update(TakeSnapshot());
@@ -694,7 +784,7 @@ public partial class MainPage : ContentPage
         active.BackgroundColor = Color.FromArgb("#2b6cff");
         active.TextColor = Colors.White;
 
-        _timeline.SetWindow(preset.GapMs >= 400 ? 16000 : 9000);
+        _timeline.SetWindow(preset.GapMs >= 700 ? 18000 : preset.GapMs >= 250 ? 12000 : 7000);
     }
 
     private void OnParamsToggleClicked(object? sender, EventArgs e)
@@ -708,7 +798,10 @@ public partial class MainPage : ContentPage
         _workers = Math.Clamp((int)Math.Round(e.NewValue), 2, MaxWorkers);
 
         if (WorkersLabel is not null)
+        {
             WorkersLabel.Text = $"Потоков: {_workers}";
+            UpdateSpeedLabels();                       // оценка «операций/с» зависит от числа потоков
+        }
 
         if (_runner is { IsRunning: true })
             StartNewRun();
@@ -719,10 +812,28 @@ public partial class MainPage : ContentPage
         int value = (int)Math.Round(e.NewValue);
 
         if (WorkLabel is not null)
-            WorkLabel.Text = $"Работа в транзакции: {value} мкс";
+            UpdateSpeedLabels();
 
         if (_runner is not null)
             _runner.Options.WorkMicroseconds = value;   // потоки читают значение на каждой операции
+    }
+
+    /// <summary>Подписи к ползункам скорости (вызывается и при старте страницы).</summary>
+    private void UpdateSpeedLabels()
+    {
+        int gap = (int)Math.Round(GapSlider.Value);
+        int work = (int)Math.Round(WorkSlider.Value);
+
+        // прикидка темпа: столько операций успевают сделать все потоки вместе
+        double perOperation = gap / 1000.0 + work / 1_000_000.0;
+        string rate = perOperation > 0
+            ? $"≈{_workers / perOperation:0} операций/с"
+            : "без пауз, в упор";
+
+        string word = gap >= 800 ? "медленно" : gap >= 250 ? "обычная" : "быстро";
+
+        GapLabel.Text = $"Скорость: {word} — пауза {gap} мс, {rate} при {_workers} потоках";
+        WorkLabel.Text = $"Работа в транзакции: {work} мкс (дольше операция — чаще конфликты)";
     }
 
     private void OnGapChanged(object? sender, ValueChangedEventArgs e)
@@ -730,10 +841,13 @@ public partial class MainPage : ContentPage
         int value = (int)Math.Round(e.NewValue);
 
         if (GapLabel is not null)
-            GapLabel.Text = $"Пауза между операциями: {value} мс";
+            UpdateSpeedLabels();
 
         if (_runner is not null)
             _runner.Options.GapMs = value;
+
+        // окно таймлайна подстраиваем под темп: на медленном видно больше истории
+        _timeline.SetWindow(value >= 700 ? 18000 : value >= 250 ? 12000 : 7000);
     }
 
     private void OnPanelWorkersClicked(object? sender, EventArgs e) => ShowPanel("workers");

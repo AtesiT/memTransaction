@@ -77,6 +77,12 @@ public sealed class NetworkDrawable : IDrawable
     /// <summary>Сколько анимаций не поместилось — показывается в подписи.</summary>
     public int Skipped { get; private set; }
 
+    /// <summary>
+    /// Множитель времени полёта монетки. Задаётся страницей: на медленном темпе
+    /// монетки летят дольше, и каждый перевод успеваешь разглядеть.
+    /// </summary>
+    public double FlightScale { get; set; } = 1.0;
+
     public string Caption { get; set; } = string.Empty;
 
     public Color CaptionColor { get; set; } = Color.FromArgb("#6d80a3");
@@ -132,7 +138,11 @@ public sealed class NetworkDrawable : IDrawable
 
         long now = Environment.TickCount64;
         int load = _coins.Count;
-        long flight = load > 60 ? 480 : load > 25 ? 700 : 950;   // при нагрузке летят быстрее
+
+        // при нагрузке монетки летят быстрее, чтобы не забивать экран,
+        // в спокойном темпе — медленнее
+        double baseFlight = load > 60 ? 620 : load > 25 ? 900 : 1200;
+        long flight = (long)Math.Clamp(baseFlight * FlightScale, 450, 2600);
 
         _coins.Add(new Coin
         {

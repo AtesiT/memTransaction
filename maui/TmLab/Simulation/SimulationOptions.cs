@@ -36,15 +36,18 @@ public sealed class SimulationOptions
     /// <summary>Максимальная сумма перевода в Примере 2.</summary>
     public int MaxTransfer { get; set; } = 50;
 
-    /// <summary>Пауза между операциями, мс. Меняется на ходу.</summary>
-    public int GapMs { get; set; } = 80;
+    /// <summary>
+    /// Пауза между операциями, мс: чем больше, тем спокойнее и нагляднее показ.
+    /// Меняется на ходу.
+    /// </summary>
+    public int GapMs { get; set; } = 400;
 
     /// <summary>
     /// «Тяжёлая работа» внутри операции, микросекунды занятого ожидания —
     /// аналог Thread.SpinWait из задания. Чем дольше операция держит счёт
     /// прочитанным, тем чаще транзакции конфликтуют. Меняется на ходу.
     /// </summary>
-    public int WorkMicroseconds { get; set; } = 320;
+    public int WorkMicroseconds { get; set; } = 600;
 
     /// <summary>Разброс времени операции: делает конфликты заметнее.</summary>
     public bool AggressiveConflicts { get; set; } = true;
@@ -52,11 +55,11 @@ public sealed class SimulationOptions
     // --- готовые темпы показа ----------------------------------------------
 
     /// <summary>Медленно: каждый перевод видно по отдельности.</summary>
-    public static SimulationOptions Show => new() { GapMs = 420, WorkMicroseconds = 1200 };
+    public static SimulationOptions Show => new() { GapMs = 1000, WorkMicroseconds = 1500 };
 
     /// <summary>Обычный темп для наблюдения.</summary>
-    public static SimulationOptions Normal => new() { GapMs = 80, WorkMicroseconds = 320 };
+    public static SimulationOptions Normal => new() { GapMs = 400, WorkMicroseconds = 600 };
 
     /// <summary>Много операций в секунду: видно конкуренцию и всплеск отказов.</summary>
-    public static SimulationOptions Load => new() { GapMs = 4, WorkMicroseconds = 200 };
+    public static SimulationOptions Load => new() { GapMs = 25, WorkMicroseconds = 300 };
 }
