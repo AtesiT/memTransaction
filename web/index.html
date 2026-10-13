@@ -49,15 +49,25 @@
       <p class="hint">Столько параллельных задач одновременно меняют одни и те же данные.</p>
     </div>
 
+    <div class="field">
+      <label class="lbl">Темп показа</label>
+      <div class="chips" id="tempo-chips">
+        <button class="chip" data-tempo="show" title="Медленно: каждый перевод видно по отдельности">🐢 показ</button>
+        <button class="chip active" data-tempo="normal" title="Обычный темп для наблюдения">▶ обычный</button>
+        <button class="chip" data-tempo="load" title="Много операций в секунду: видно конкуренцию и всплеск откатов">⚡ нагрузка</button>
+      </div>
+      <p class="hint">Темп меняет паузу между операциями и время «раздумий» внутри транзакции — переключается на ходу.</p>
+    </div>
+
     <div class="field" id="field-work">
-      <label class="lbl" for="work">Работа внутри транзакции: <b id="work-val">260</b> мкс</label>
-      <input type="range" id="work" min="0" max="2000" step="20" value="260">
+      <label class="lbl" for="work">Работа внутри транзакции: <b id="work-val">320</b> мкс</label>
+      <input type="range" id="work" min="0" max="3000" step="20" value="320">
       <p class="hint">Аналог <code>Thread.SpinWait()</code> из примера: чем дольше транзакция «думает», тем больше конфликтов.</p>
     </div>
 
     <div class="field">
-      <label class="lbl" for="gap">Пауза между операциями: <b id="gap-val">8</b> мс</label>
-      <input type="range" id="gap" min="0" max="40" step="1" value="8">
+      <label class="lbl" for="gap">Пауза между операциями: <b id="gap-val">80</b> мс</label>
+      <input type="range" id="gap" min="0" max="600" step="10" value="80">
       <p class="hint">Интенсивность: сколько «отдыхает» поток между операциями.</p>
     </div>
 
@@ -118,6 +128,18 @@
 
     <!-- ---- Общая визуализация (для обоих демо) ---- -->
     <div class="grid">
+      <div class="panel span2">
+        <h2 id="net-title">Переводы между участниками <span class="tag" id="net-tag">живая схема</span></h2>
+        <canvas id="network" height="380"></canvas>
+        <div class="legend" id="net-legend">
+          <span><i class="sw sw-commit"></i>успешный перевод (деньги дошли)</span>
+          <span><i class="sw sw-conflict"></i>конфликт — транзакция откатилась, деньги не ушли</span>
+          <span><i class="sw sw-validate"></i>отказ: недостаточно средств</span>
+          <span><i class="sw sw-wait"></i>счёт заблокирован</span>
+        </div>
+        <p class="hint" id="net-hint"></p>
+      </div>
+
       <div class="panel span2">
         <h2>Состояние потоков <span class="tag">живые данные из общей памяти</span></h2>
         <div class="workers" id="workers-grid"></div>
@@ -432,6 +454,7 @@ node tests/tm.test.js</code></pre>
 <script src="js/tm-core.js"></script>
 <script src="js/sim-engine.js"></script>
 <script src="js/runner.js"></script>
+<script src="js/network.js"></script>
 <script src="js/timeline.js"></script>
 <script src="js/app.js"></script>
 </body>

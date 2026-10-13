@@ -374,12 +374,18 @@
         var next = cur + op.amount;
         yield { t: 'SPIN', us: state.workUs, label: 'вычисление', opId: op.id };
         var ok = yield { t: 'CAS', acc: op.acc, expected: cur, desired: next, opId: op.id, opEnd: true };
-        if (ok) { ctx.emit({ ev: 'cas-success', pid: ctx.pid, opId: op.id, spins: spins }); break; }
+        if (ok) {
+          ctx.emit({ ev: 'cas-success', pid: ctx.pid, opId: op.id, spins: spins, acc: op.acc, amount: op.amount });
+          break;
+        }
         spins++;
         ctx.stats.retries++;
         ctx.mem.bump(H.RETRIES);
         ctx.mem.workerStatAdd(ctx.pid, 1, 1);
-        ctx.emit({ ev: 'conflict', pid: ctx.pid, opId: op.id, kind: 'cas', acc: op.acc, attempt: spins });
+        ctx.emit({
+          ev: 'conflict', pid: ctx.pid, opId: op.id, kind: 'cas',
+          acc: op.acc, amount: op.amount, attempt: spins
+        });
         if (spins > MAX_RETRIES) break;     // защита от «живой блокировки»
       }
 
@@ -436,7 +442,10 @@
         var to = yield { t: 'READ', acc: op.to, opId: op.id, tryId: tryId };
 
         if (from < op.amount) {                       // бизнес-отказ, не конфликт
-          ctx.emit({ ev: 'txn-abort', pid: ctx.pid, opId: op.id, tryId: tryId, reason: 'insufficient' });
+          ctx.emit({
+            ev: 'txn-abort', pid: ctx.pid, opId: op.id, tryId: tryId, reason: 'insufficient',
+            from: op.from, to: op.to, amount: op.amount
+          });
           yield { t: 'ROLLBACK', reason: 'insufficient', opId: op.id, tryId: tryId, opEnd: true };
           break;
         }
@@ -467,7 +476,10 @@
           ctx.mem.bump(H.RETRIES);
           ctx.mem.workerStatAdd(ctx.pid, 1, 1);
           yield { t: 'ROLLBACK', reason: 'conflict' };
-          ctx.emit({ ev: 'txn-conflict', pid: ctx.pid, opId: op.id, tryId: tryId, attempt: attempt });
+          ctx.emit({
+            ev: 'txn-conflict', pid: ctx.pid, opId: op.id, tryId: tryId, attempt: attempt,
+            from: op.from, to: op.to, amount: op.amount
+          });
           if (attempt > MAX_RETRIES) {                // теоретический livelock
             ctx.stats.aborts++;
             ctx.mem.bump(H.ABORTS);
@@ -479,7 +491,10 @@
 
         yield { t: 'COMMIT', opId: op.id, tryId: tryId, opEnd: true };
         yield { t: 'UNLOCK', acc: COMMIT_LOCK_SLOT, label: 'commit-lock', opId: op.id, tryId: tryId };
-        ctx.emit({ ev: 'txn-commit', pid: ctx.pid, opId: op.id, tryId: tryId, attempt: attempt });
+        ctx.emit({
+          ev: 'txn-commit', pid: ctx.pid, opId: op.id, tryId: tryId, attempt: attempt,
+          from: op.from, to: op.to, amount: op.amount
+        });
         break;
       }
 
@@ -499,9 +514,15 @@
       if (from >= op.amount) {
         yield { t: 'STORE', acc: op.from, value: from - op.amount, opId: op.id, unsynced: true };
         yield { t: 'STORE', acc: op.to, value: to + op.amount, opId: op.id, unsynced: true, opEnd: true };
-        ctx.emit({ ev: 'txn-commit', pid: ctx.pid, opId: op.id, attempt: 1, unsynced: true });
+        ctx.emit({
+          ev: 'txn-commit', pid: ctx.pid, opId: op.id, attempt: 1, unsynced: true,
+          from: op.from, to: op.to, amount: op.amount
+        });
       } else {
-        ctx.emit({ ev: 'txn-abort', pid: ctx.pid, opId: op.id, reason: 'insufficient' });
+        ctx.emit({
+          ev: 'txn-abort', pid: ctx.pid, opId: op.id, reason: 'insufficient',
+          from: op.from, to: op.to, amount: op.amount
+        });
         yield { t: 'ROLLBACK', reason: 'insufficient', opId: op.id, opEnd: true };
       }
       yield { t: 'SLEEP', us: state.gapUs };
@@ -532,9 +553,15 @@
       if (from >= op.amount) {
         yield { t: 'STORE', acc: op.from, value: from - op.amount, opId: op.id, underLock: true };
         yield { t: 'STORE', acc: op.to, value: to + op.amount, opId: op.id, underLock: true, opEnd: true };
-        ctx.emit({ ev: 'txn-commit', pid: ctx.pid, opId: op.id, attempt: 1, underLock: true });
+        ctx.emit({
+          ev: 'txn-commit', pid: ctx.pid, opId: op.id, attempt: 1, underLock: true,
+          from: op.from, to: op.to, amount: op.amount
+        });
       } else {
-        ctx.emit({ ev: 'txn-abort', pid: ctx.pid, opId: op.id, reason: 'insufficient' });
+        ctx.emit({
+          ev: 'txn-abort', pid: ctx.pid, opId: op.id, reason: 'insufficient',
+          from: op.from, to: op.to, amount: op.amount
+        });
         yield { t: 'ROLLBACK', reason: 'insufficient', opId: op.id, opEnd: true };
       }
 

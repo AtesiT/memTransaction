@@ -59,13 +59,14 @@
     technique: T.CAS,
     mix: false,
     workers: 8,
-    workUs: 260,
-    gapMs: 8,
+    workUs: 320,
+    gapMs: 80,
     speed: 3,
     boost: true,
     accounts: 1,
     total: 1000,
     amount: 10,
+    tempo: 'normal',
     status: 'idle',     // idle | running | paused | finished
     clock: Date.now(),  // «сейчас» в шкале текущего режима (мс эпохи или виртуальные)
     mode: 'idle',
@@ -80,6 +81,7 @@
 
   var runner = null;
   var timeline = null;
+  var network = null;   // схема переводов между участниками
   var workerStates = [];      // последнее состояние каждого потока
   var workerLastEvent = [];   // когда поток в последний раз подавал признаки жизни
   var accountsFlash = [];     // {pid, kind, until} — подсветка счёта
@@ -89,6 +91,54 @@
   // -------------------------------------------------------------------------
   // Вкладки и сценарии
   // -------------------------------------------------------------------------
+
+  // -------------------------------------------------------------------------
+  // Темп показа: «медленно и наглядно» ↔ «нагрузка»
+  // -------------------------------------------------------------------------
+  var TEMPO = {
+    show:   { gap: 420, work: 1200, speed: 2, windowMs: 14000, title: 'показ' },
+    normal: { gap: 80,  work: 320,  speed: 3, windowMs: 9000,  title: 'обычный' },
+    load:   { gap: 4,   work: 200,  speed: 6, windowMs: 6000,  title: 'нагрузка' }
+  };
+
+  function applyTempo(name) {
+    var t = TEMPO[name] || TEMPO.normal;
+    S.tempo = name;
+    S.gapMs = t.gap;
+    S.workUs = t.work;
+    S.speed = t.speed;
+
+    $('gap').value = t.gap;
+    $('gap-val').textContent = t.gap;
+    $('work').value = t.work;
+    $('work-val').textContent = t.work;
+    $('speed').value = t.speed;
+    $('speed-val').textContent = t.speed;
+    timeline.opts.windowMs = t.windowMs;
+    timeline.windowMs = t.windowMs;
+
+    if (runner) {
+      runner.setGapMs(t.gap);
+      runner.setWorkUs(t.work);
+      runner.setSpeed(t.speed);
+    }
+
+    var chips = document.querySelectorAll('#tempo-chips .chip');
+    for (var i = 0; i < chips.length; i++) {
+      chips[i].classList.toggle('active', chips[i].getAttribute('data-tempo') === name);
+    }
+    logEvent('info', 'темп «' + t.title + '»: пауза ' + t.gap + ' мс, работа в транзакции ' + t.work + ' мкс');
+  }
+
+  function setupTempo() {
+    var chips = document.querySelectorAll('#tempo-chips .chip');
+    for (var i = 0; i < chips.length; i++) {
+      (function (chip) {
+        chip.addEventListener('click', function () { applyTempo(chip.getAttribute('data-tempo')); });
+      })(chips[i]);
+    }
+  }
+
   function setupTabs() {
     var tabs = document.querySelectorAll('.tab');
     for (var i = 0; i < tabs.length; i++) {
@@ -127,7 +177,15 @@
     renderTechniqueChips();
     buildAccounts();
     buildWorkerGrid();
-    if (restart) { stopRun(); clearAll(); }
+    setupNetworkView();
+    // Перезапуск по смене сценария: если демонстрация шла — продолжаем её
+    // в новом режиме, а не оставляем пользователя с погасшим экраном.
+    if (restart) {
+      var wasRunning = (S.status === 'running' || S.status === 'paused');
+      stopRun();
+      clearAll();
+      if (wasRunning) startRun();
+    }
   }
 
   function renderTechniqueChips() {
@@ -143,6 +201,7 @@
         S.mix = !!(t.preset && t.preset.mix);
         renderTechniqueChips();
         $('technique-hint').textContent = t.hint;
+        updateNetworkCaption();
         restartRun();
       });
       box.appendChild(b);
@@ -191,6 +250,7 @@
     workerStates = new Array(S.workers).fill('idle');
     workerLastEvent = new Array(S.workers).fill(0);
     timeline.setWorkerCount(S.workers);
+    if (network) { network.workers = S.workers; }
 
     var sel = $('pid-select');
     sel.innerHTML = '';
@@ -202,6 +262,49 @@
     sel.value = S.selectedPid = 0;
     journal = [];
     renderJournal();
+  }
+
+  /** Схема переводов: в переводах — участники по кругу, в зачислении — счёт в центре. */
+  function setupNetworkView() {
+    if (!network) return;
+    var deposit = (S.demo === 1);
+    network.workers = S.workers;
+    network.setup(deposit ? 'deposit' : 'transfer', S.accounts, S.workers);
+
+    $('net-title').innerHTML = deposit
+      ? 'Зачисление на счёт <span class="tag" id="net-tag">потоки → одна ячейка памяти</span>'
+      : 'Переводы между участниками <span class="tag" id="net-tag">живая схема транзакций</span>';
+    $('net-hint').textContent = deposit
+      ? 'Кружки по краям — потоки. Монетка долетает до счёта только тогда, когда CompareExchange прошёл: если другой поток успел изменить баланс, монетка (красная) гаснет и операция повторяется.'
+      : 'Каждая линия — попытка перевода. Зелёная монетка долетает до получателя — транзакция зафиксирована; красная гаснет на полпути — конфликт версий, транзакция откатилась и будет переиграна.';
+
+    $('net-legend').innerHTML = deposit
+      ? '<span><i class="sw sw-commit"></i>CompareExchange прошёл — монетка долетела</span>' +
+        '<span><i class="sw sw-conflict"></i>конфликт: баланс изменили — повтор</span>' +
+        '<span><i class="sw sw-wait"></i>поток ждёт освобождения счёта</span>'
+      : '<span><i class="sw sw-commit"></i>перевод зафиксирован — деньги дошли</span>' +
+        '<span><i class="sw sw-conflict"></i>конфликт версий: транзакция откатилась, деньги не ушли</span>' +
+        '<span><i class="sw sw-validate"></i>отказ: недостаточно средств</span>' +
+        '<span><i class="sw sw-wait"></i>счёт заблокирован, поток ждёт</span>';
+    network.clear();
+    updateNetworkCaption();
+  }
+
+  /** Подпись под схемой: отдельно выделяем «сломанный» и смешанный режимы. */
+  function updateNetworkCaption() {
+    if (!network) return;
+    var unsafe = (S.technique === T.UNSAFE);
+    var mixed = (S.demo === 2 && S.mix);
+    if (unsafe) {
+      network.caption = 'БЕЗ СИНХРОНИЗАЦИИ: транзакций нет, деньги теряются и появляются из ниоткуда';
+      network.captionColor = '#ff5d6c';
+    } else if (mixed) {
+      network.caption = 'смешанный режим: чётные потоки — транзакции, нечётные — блокировки';
+      network.captionColor = '#ffb020';
+    } else {
+      network.caption = '';
+      network.captionColor = '#6d80a3';
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -298,6 +401,7 @@
     renderJournal();
     $('events').innerHTML = '';
     timeline.clear();
+    if (network) network.clear();
     timeline.setWorkerCount(S.workers);
     for (var i = 0; i < S.workers; i++) {
       workerStates[i] = 'idle';
@@ -370,12 +474,14 @@
 
       case 'cas-success':
         setWorkerState(pid, 'commit', 'CAS удался' + (ev.spins ? ' после ' + ev.spins + ' повторов' : ''));
+        network.send({ pid: pid, amount: ev.amount, status: 'ok', from: 0, to: 0 });
         break;
 
       case 'conflict':
         timeline.phase(pid, 'conflict', t);
         timeline.attemptEnd(pid, t, 'conflict');
         setWorkerState(pid, 'conflict', 'CAS не совпал → повтор');
+        network.send({ pid: pid, amount: ev.amount, status: 'conflict', from: 0, to: 0 });
         logEvent('conflict', '#' + pid + ' конфликт CAS (попытка ' + ev.attempt + ') на счёте ' + letter(ev.acc));
         break;
 
@@ -383,23 +489,29 @@
         timeline.phase(pid, 'commit', t);
         timeline.attemptEnd(pid, t, 'commit');
         setWorkerState(pid, 'commit', 'коммит');
+        network.send({ from: ev.from, to: ev.to, amount: ev.amount, status: 'ok', pid: pid });
         if (pid === S.selectedPid) addJournal('транзакция зафиксирована (попытка ' + ev.attempt + ')', '', '', '');
-        logEvent('commit', '#' + pid + ' коммит перевода (попытка ' + ev.attempt + ')');
+        logEvent('commit', '#' + pid + ' перевод ' + ev.amount + ' ₽: ' + letter(ev.from) + ' → ' + letter(ev.to) +
+          ' зафиксирован (попытка ' + ev.attempt + ')');
         break;
 
       case 'txn-conflict':
         timeline.phase(pid, 'conflict', t);
         timeline.attemptEnd(pid, t, 'conflict');
         setWorkerState(pid, 'conflict', 'конфликт → откат');
+        network.send({ from: ev.from, to: ev.to, amount: ev.amount, status: 'conflict', pid: pid });
         if (pid === S.selectedPid) addJournal('конфликт версий → откат и повтор', '', '', '');
-        logEvent('conflict', '#' + pid + ' конфликт транзакции (попытка ' + ev.attempt + ') → откат и повтор');
+        logEvent('conflict', '#' + pid + ' перевод ' + ev.amount + ' ₽: ' + letter(ev.from) + ' → ' + letter(ev.to) +
+          ' конфликт (попытка ' + ev.attempt + ') → откат и повтор');
         break;
 
       case 'txn-abort':
         timeline.attemptEnd(pid, t, 'abort');
         setWorkerState(pid, 'conflict', ev.reason === 'insufficient' ? 'нет средств' : 'отказ');
         if (ev.reason === 'insufficient') {
-          logEvent('abort', '#' + pid + ' отказ: недостаточно средств (транзакция отменена)');
+          network.send({ from: ev.from, to: ev.to, amount: ev.amount, status: 'abort', pid: pid });
+          logEvent('abort', '#' + pid + ' перевод ' + ev.amount + ' ₽: ' + letter(ev.from) + ' → ' + letter(ev.to) +
+            ' — недостаточно средств, транзакция отменена');
         } else {
           logEvent('abort', '#' + pid + ' отказ по причине ' + ev.reason);
         }
@@ -538,6 +650,7 @@
     if (!snap) return;
 
     drawAccounts(snap);
+    drawNetwork(snap);
     drawWorkers(snap);
     drawMetrics(snap);
     updateInvariant(snap);
@@ -576,6 +689,12 @@
       el2.classList.toggle('flash-commit', !!flashCommit[k]);
       el2.classList.toggle('flash-conflict', !!flashConflict[k]);
     }
+  }
+
+  function drawNetwork(snap) {
+    if (!network) return;
+    network.setAccounts(snap.balances, snap.versions, function (i) { return runner.mem.isLocked(i); });
+    network.render(performance.now());
   }
 
   function drawWorkers(snap) {
@@ -722,6 +841,8 @@
     });
     $('btn-reset').addEventListener('click', function () { stopRun(); clearAll(); });
 
+    setupTempo();
+
     $('pid-select').addEventListener('change', function () {
       S.selectedPid = Number(this.value);
       journal = [];
@@ -743,7 +864,20 @@
   // Инициализация
   // -------------------------------------------------------------------------
   function init() {
-    timeline = new window.Timeline($('timeline'), { windowMs: 6000 });
+    timeline = new window.Timeline($('timeline'), { windowMs: TEMPO.normal.windowMs });
+    network = new window.NetworkView($('network'), {});
+
+    // Небольшая отладочная ручка: состояние стенда видно из консоли браузера
+    // (и используется автотестами интерфейса).
+    window.STMLab = {
+      get state() { return S; },
+      get runner() { return runner; },
+      get network() { return network; },
+      get timeline() { return timeline; },
+      tempo: function (name) { applyTempo(name); },
+      start: function () { startRun(); },
+      reset: function () { stopRun(); clearAll(); }
+    };
     setupTabs();
     setupControls();
     applyDemo('demo1', false);

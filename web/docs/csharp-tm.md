@@ -372,9 +372,108 @@ protected override void OnAppearing()
 | `Timeline` на canvas | `IDrawable` + `GraphicsView` | графика параллелизма в MAUI |
 | события воркеров через `postMessage` | `event Action<WorkerEvent>` + `MainThread.BeginInvokeOnMainThread` | обновление UI из потоков |
 
+### Визуализация переводов в MAUI (линии между участниками)
+
+В веб-версии переводы рисуются как монетки, летящие по линиям между участниками.
+В MAUI это делается через `IDrawable` + `GraphicsView`. Важно: события из потоков
+нельзя рисовать напрямую — их складывают в очередь, а разбирают и рисуют в `Draw`.
+
+```csharp
+// Модель одного перевода для анимации
+public sealed class Transfer
+{
+    public int From, To, Amount;
+    public TransferStatus Status;      // Ok | Conflict | InsufficientFunds
+    public DateTime StartedAt;
+    public TimeSpan Flight = TimeSpan.FromMilliseconds(900);
+}
+
+public sealed class NetworkDrawable : IDrawable
+{
+    private readonly ConcurrentQueue<Transfer> _incoming = new();
+    private readonly List<Transfer> _active = new();
+    private readonly Dictionary<int, (double X, double Y)> _nodes = new();
+
+    public double[] Balances = Array.Empty<double>();   // из снапшота состояния
+    private readonly double[] _pending = new double[8]; // суммы «в пути» к получателю
+
+    public void Push(Transfer t) => _incoming.Enqueue(t);   // вызывается из потоков
+
+    public void Draw(ICanvas canvas, RectF r)
+    {
+        while (_incoming.TryDequeue(out var t))
+        {
+            if (t.Status == TransferStatus.Ok) _pending[t.To] += t.Amount;  // деньги ещё в пути
+            _active.Add(t);
+        }
+
+        Layout(r);                                   // расставить участников по кругу
+        var now = DateTime.UtcNow;
+
+        for (int i = _active.Count - 1; i >= 0; i--)
+        {
+            var t = _active[i];
+            double progress = (now - t.StartedAt).TotalMilliseconds / t.Flight.TotalMilliseconds;
+            if (progress >= 1)
+            {
+                if (t.Status == TransferStatus.Ok) _pending[t.To] -= t.Amount;  // монетка долетела
+                _active.RemoveAt(i);
+                continue;
+            }
+            if (t.Status != TransferStatus.Ok) progress = Math.Min(progress, 0.55);
+
+            var from = _nodes[t.From];
+            var to = _nodes[t.To];
+            var x = from.X + (to.X - from.X) * progress;
+            var y = from.Y + (to.Y - from.Y) * progress - Math.Sin(progress * Math.PI) * 40;  // дугой
+
+            canvas.StrokeColor = t.Status == TransferStatus.Ok ? Colors.SeaGreen : Colors.Crimson;
+            canvas.StrokeSize = 2;
+            canvas.DrawLine(from.Xf(), from.Yf(), (float)x, (float)y);      // «хвост» монетки
+
+            canvas.FillColor = t.Status == TransferStatus.Ok ? Colors.SeaGreen : Colors.Crimson;
+            canvas.FillCircle((float)x, (float)y, 9);                       // сама монетка
+            canvas.FontColor = Colors.White;
+            canvas.DrawString(t.Amount.ToString(), (float)x, (float)y - 22, HorizontalAlignment.Center);
+        }
+
+        DrawNodes(canvas);   // баланс = Balances[i] - _pending[i]: деньги видны по прилёте
+    }
+}
+```
+
+Периодическая перерисовка со страницы (25–30 кадров в секунду достаточно):
+
+```csharp
+private IDispatcherTimer? _timer;
+protected override void OnAppearing()
+{
+    base.OnAppearing();
+    _timer = Dispatcher.CreateTimer();
+    _timer.Interval = TimeSpan.FromMilliseconds(40);
+    _timer.Tick += (_, __) => NetworkView.Invalidate();
+    _timer.Start();
+}
+```
+
+Темп показа (как кнопки «показ / обычный / нагрузка» в веб-версии) — это просто
+набор значений `SimulationOptions`:
+
+```csharp
+public static class Tempo
+{
+    public static SimulationOptions Show    => new() { GapMs = 420, WorkSpin = 1200 };
+    public static SimulationOptions Normal  => new() { GapMs = 80,  WorkSpin = 320  };
+    public static SimulationOptions Load    => new() { GapMs = 4,   WorkSpin = 200  };
+}
+```
+
 ### Что стоит передать в мобильную версию
 
 * переключение сценария: **STM / блокировки / CAS / без синхронизации**;
+* схему переводов: участники, линии, монетки с суммой (зелёная долетела,
+  красная погасла — откат), подсветка блокировок;
+* три темпа показа («показ / обычный / нагрузка») для демонстрации;
 * счётчики: операции, коммиты, откаты-конфликты, эффективность;
 * индикатор инварианта: сумма на счетах не должна меняться;
 * таймлайн: дорожки потоков с фазами «чтение → вычисления → валидация → коммит»

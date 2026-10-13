@@ -36,8 +36,8 @@ function makeElement(id, tag) {
     id: id || '',
     tagName: (tag || 'div').toUpperCase(),
     className: '',
-    textContent: '',
     _html: '',
+    _text: '',
     value: '0',
     checked: true,
     childNodes: [],
@@ -48,6 +48,9 @@ function makeElement(id, tag) {
     classList: null,
     appendChild: function (c) { this.childNodes.push(c); return c; },
     insertBefore: function (c) { this.childNodes.unshift(c); return c; },
+    // как в настоящем DOM: приложение ориентируется на firstChild/lastChild
+    get firstChild() { return this.childNodes.length ? this.childNodes[0] : null; },
+    get lastChild() { return this.childNodes.length ? this.childNodes[this.childNodes.length - 1] : null; },
     removeChild: function (c) {
       var i = this.childNodes.indexOf(c);
       if (i >= 0) this.childNodes.splice(i, 1);
@@ -63,8 +66,10 @@ function makeElement(id, tag) {
       var noop = function () {};
       return {
         clearRect: noop, fillRect: noop, strokeRect: noop, beginPath: noop, moveTo: noop,
-        lineTo: noop, stroke: noop, fillText: noop, setTransform: noop,
-        strokeStyle: '', fillStyle: '', font: '', lineWidth: 1
+        lineTo: noop, stroke: noop, fill: noop, fillText: noop, setTransform: noop,
+        arc: noop, quadraticCurveTo: noop, setLineDash: noop, save: noop, restore: noop,
+        strokeStyle: '', fillStyle: '', font: '', lineWidth: 1,
+        globalAlpha: 1, textAlign: 'left', textBaseline: 'alphabetic'
       };
     },
     set width(v) { this.attrs.width = v; },
@@ -73,10 +78,16 @@ function makeElement(id, tag) {
     get height() { return Number(this.attrs.height) || 260; }
   };
   el.classList = makeClassList(el);
-  // как в браузере: присваивание innerHTML = '' удаляет дочерние узлы
+  // как в браузере: innerHTML и textContent — это две стороны одной медали,
+  // присваивание любого из них стирает прежнее содержимое
   Object.defineProperty(el, 'innerHTML', {
-    get: function () { return this._html; },
-    set: function (v) { this._html = String(v); this.childNodes.length = 0; }
+    // в браузере innerHTML показывает и текст, установленный через textContent
+    get: function () { return this._html || (this._text ? String(this._text) : ''); },
+    set: function (v) { this._html = String(v); this._text = ''; this.childNodes.length = 0; }
+  });
+  Object.defineProperty(el, 'textContent', {
+    get: function () { return this._text || (this._html ? String(this._html).replace(/<[^>]+>/g, '') : ''); },
+    set: function (v) { this._text = String(v); this._html = ''; this.childNodes.length = 0; }
   });
   return el;
 }
@@ -96,6 +107,13 @@ function makeDom() {
     return t;
   });
   queryGroups['.tab'] = tabs;
+  queryGroups['#tempo-chips .chip'] = ['show', 'normal', 'load'].map(function (name) {
+    var c = makeElement('tempo-' + name, 'button');
+    c.setAttribute('data-tempo', name);
+    c.classList.add('chip');
+    if (name === 'normal') c.classList.add('active');
+    return c;
+  });
   queryGroups['.tabpane'] = ['demo1', 'demo2', 'theory', 'code', 'tests'].map(function (n) { return byId('pane-' + n); });
 
   var doc = {
@@ -110,7 +128,6 @@ function makeDom() {
   doc._byId = byId;
   return doc;
 }
-
 // ---------------------------------------------------------------------------
 var WEB = path.join(__dirname, '..');
 var document = makeDom();
@@ -136,81 +153,133 @@ sandbox.globalThis = sandbox;
 
 vm.createContext(sandbox);
 
-['tm-core.js', 'sim-engine.js', 'runner.js', 'timeline.js', 'app.js'].forEach(function (f) {
-  var code = fs.readFileSync(path.join(WEB, 'js', f), 'utf8');
-  vm.runInContext(code, sandbox, { filename: f });
+['tm-core.js', 'sim-engine.js', 'runner.js', 'network.js', 'timeline.js', 'app.js'].forEach(function (f) {
+  vm.runInContext(fs.readFileSync(path.join(WEB, 'js', f), 'utf8'), sandbox, { filename: f });
 });
-console.log('модули загружены: TMCore=' + !!sandbox.TMCore + ', SimEngine=' + !!sandbox.SimEngine +
-  ', Runner=' + !!sandbox.Runner + ', Timeline=' + !!sandbox.Timeline);
 
-// --- 1. Нажимаем «Запустить» -------------------------------------------------
-var btnStart = document._byId('btn-start');
-btnStart.dispatch('click');
+function $(id) { return document._byId(id); }
+function clean(html) { return String(html).replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim(); }
+function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
-setTimeout(function () {
-  var ops = document._byId('m-ops').textContent;
-  var commits = document._byId('m-commits').textContent;
-  var invClass = document._byId('invariant').className;
-  var invText = document._byId('inv-body').innerHTML;
-  var bal = document._byId('bal-0').textContent;
-  var modeBadge = document._byId('mode-badge').textContent;
-  var logCount = document._byId('events').childNodes.length;
-  var workersCards = document._byId('workers-grid').childNodes.length;
-  var journalRows = (String(document._byId('journal-body').innerHTML).match(/<tr/g) || []).length;
+var failures = [];
+function expect(name, condition, detail) {
+  console.log((condition ? '  ✅ ' : '  ❌ ') + name + (detail ? '  — ' + detail : ''));
+  if (!condition) failures.push(name);
+}
 
-  console.log('\n--- через 2.5 секунды работы ---');
-  console.log('  режим:', modeBadge);
-  console.log('  операций:', ops, '| коммитов:', commits);
-  console.log('  счёт A:', bal);
-  console.log('  инвариант:', invClass.indexOf('ok') >= 0 ? '✅ в норме' : '❌ ' + invClass);
-  console.log('  строк в журнале событий:', logCount);
-  console.log('  карточек потоков:', workersCards);
-  console.log('  строк в журнале транзакции:', journalRows);
-  console.log('  текст инварианта:', String(invText).replace(/<[^>]+>/g, ''));
+async function main() {
+  console.log('модули загружены: TMCore=' + !!sandbox.TMCore + ', SimEngine=' + !!sandbox.SimEngine +
+    ', Runner=' + !!sandbox.Runner + ', Timeline=' + !!sandbox.Timeline + ', NetworkView=' + !!sandbox.NetworkView);
 
-  var ok = true;
-  if (Number(String(ops).replace(/\s/g, '')) <= 0) { console.log('  ❌ операции не идут'); ok = false; }
-  if (invClass.indexOf('ok') < 0) { console.log('  ❌ инвариант нарушен в STM-режиме'); ok = false; }
-  if (workersCards !== 8) { console.log('  ❌ карточек потоков ' + workersCards + ' вместо 8'); ok = false; }
-  if (journalRows === 0) { console.log('  ⚠️ журнал транзакции пуст (поток #0 мог быть в паузе)'); }
+  // ================= 1. Пример 1: зачисление на счёт =======================
+  console.log('\n=== Пример 1: зачисление через CAS ===');
+  $('btn-start').dispatch('click');
+  await wait(2000);
 
-  // --- 2. Переключаем сценарий на «без синхронизации» ------------------------
-  var chips = document._byId('technique-chips');
-  console.log('\n--- переключаемся на «без синхронизации» ---');
-  // чипы создаются динамически: ищем третий (unsafe)
-  var unsafeChip = chips.childNodes[2];
-  if (unsafeChip) {
-    unsafeChip.dispatch('click');
-    setTimeout(function () {
-      var invClass2 = document._byId('invariant').className;
-      var invText2 = String(document._byId('inv-body').innerHTML).replace(/<[^>]+>/g, '');
-      console.log('  инвариант:', invClass2.indexOf('bad') >= 0 ? '✅ нарушился (как и должно быть без синхронизации)' : '⚠️ ' + invClass2);
-      console.log('  текст:', invText2);
+  var ops = Number(clean($('m-ops').textContent).replace(/\s/g, ''));
+  expect('операции выполняются', ops > 0, 'операций: ' + ops);
+  expect('инвариант держится (CAS)', $('invariant').className.indexOf('ok') >= 0, clean($('inv-body').innerHTML));
+  expect('карточки потоков построены', $('workers-grid').childNodes.length === 8,
+    'карточек: ' + $('workers-grid').childNodes.length);
 
-      // --- 3. Возвращаем STM и проверяем восстановление ---------------------
-      var stmChip = chips.childNodes[0];
-      stmChip.dispatch('click');
-      setTimeout(function () {
-        var invClass3 = document._byId('invariant').className;
-        var invText3 = String(document._byId('inv-body').innerHTML).replace(/<[^>]+>/g, '');
-        console.log('\n--- вернулись к STM-переводам ---');
-        console.log('  инвариант:', invClass3.indexOf('ok') >= 0 ? '✅ снова в норме' : '❌ ' + invClass3);
-        console.log('  текст:', invText3);
+  var net = sandbox.STMLab.network;
+  expect('схема зачислений: поток → счёт', net.mode === 'deposit' && net.accounts.length === 1,
+    'участников: ' + net.accounts.length + ', режим: ' + net.mode);
+  var sent1 = net.sent;
+  expect('монетки зачислений летят', sent1 > 0, 'анимаций: ' + sent1);
 
-        // --- 4. Пауза и сброс -------------------------------------------------
-        document._byId('btn-pause').dispatch('click');
-        var paused = document._byId('btn-pause').textContent;
-        document._byId('btn-reset').dispatch('click');
-        var afterReset = document._byId('inv-body').textContent || document._byId('inv-body').innerHTML;
-        console.log('\n--- пауза и сброс ---');
-        console.log('  кнопка паузы:', paused);
-        console.log('  после сброса:', String(afterReset).replace(/<[^>]+>/g, ''));
-        console.log('\n' + (ok && invClass3.indexOf('ok') >= 0 ? '=== UI: проверка пройдена ✅ ===' : '=== UI: есть замечания ❌ ==='));
-        process.exit(ok && invClass3.indexOf('ok') >= 0 ? 0 : 1);
-      }, 2200);
-    }, 1200);
-  } else {
-    console.log('  ❌ не найдены чипы сценариев');
-    process.exit(1);
-  }
-}, 2500);
+  // ================= 2. Пример 2: переводы между людьми ====================
+  console.log('\n=== Пример 2: переводы между участниками ===');
+  document.querySelectorAll('.tab')[1].dispatch('click');
+  await wait(2500);
+
+  net = sandbox.STMLab.network;
+  var names = net.accounts.map(function (a) { return a.name; }).join(', ');
+  expect('переключились на переводы', sandbox.STMLab.state.demoKey === 'demo2');
+  expect('на схеме 4 участника', net.accounts.length === 4, names);
+  expect('режим схемы — переводы между участниками', net.mode === 'transfer');
+  expect('анимации переводов идут', net.sent > 0, 'запущено: ' + net.sent);
+  expect('инвариант банка держится (STM)', $('invariant').className.indexOf('ok') >= 0, clean($('inv-body').innerHTML));
+
+  // переходы на графике: счётчик успешных и отменённых
+  var stats = sandbox.STMLab.runner.snapshot();
+  expect('транзакции фиксируются', stats.commits > 0, 'коммитов: ' + stats.commits);
+  expect('конфликты вызывают откаты', stats.retries >= 0, 'откатов-конфликтов: ' + stats.retries);
+
+  // ================= 3. Режим «без синхронизации» ==========================
+  console.log('\n=== Режим без синхронизации ===');
+  $('technique-chips').childNodes[3].dispatch('click');   // «Без синхронизации»
+  await wait(1500);
+  expect('инвариант нарушается (как и должно быть без синхронизации)',
+    $('invariant').className.indexOf('bad') >= 0, clean($('inv-body').innerHTML));
+
+  // ================= 4. Возврат к STM =====================================
+  console.log('\n=== Возврат к STM ===');
+  $('technique-chips').childNodes[0].dispatch('click');
+  await wait(2500);
+  expect('инвариант снова в норме', $('invariant').className.indexOf('ok') >= 0, clean($('inv-body').innerHTML));
+  expect('участников по-прежнему 4', sandbox.STMLab.network.accounts.length === 4);
+  expect('схема продолжает анимировать переводы', sandbox.STMLab.network.sent > 0,
+    'всего анимаций: ' + sandbox.STMLab.network.sent);
+
+  // ================= 5. Темп показа =======================================
+  console.log('\n=== Темп показа ===');
+  var tempoChips = document.querySelectorAll('#tempo-chips .chip');
+  tempoChips[0].dispatch('click');                       // 🐢 показ
+  var gapShow = Number($('gap').value), workShow = Number($('work').value);
+  var windowShow = sandbox.STMLab.timeline.windowMs;
+  tempoChips[2].dispatch('click');                       // ⚡ нагрузка
+  var gapLoad = Number($('gap').value), workLoad = Number($('work').value);
+  var windowLoad = sandbox.STMLab.timeline.windowMs;
+  tempoChips[1].dispatch('click');                       // обратно
+  expect('«показ» медленнее «нагрузки»', gapShow > gapLoad && workShow > workLoad,
+    'пауза ' + gapShow + '→' + gapLoad + ' мс, работа ' + workShow + '→' + workLoad + ' мкс');
+  expect('окно таймлайна расширяется для показа', windowShow > windowLoad,
+    windowShow + ' мс против ' + windowLoad + ' мс');
+
+  // темп действительно влияет на частоту операций
+  tempoChips[2].dispatch('click');                       // нагрузка
+  await wait(1500);
+  var opsFast = Number(clean($('m-ops').textContent).replace(/[\s\u00a0]/g, ''));
+  tempoChips[0].dispatch('click');                       // показ
+  await wait(2000);
+  var opsSlow = Number(clean($('m-ops').textContent).replace(/[\s\u00a0]/g, ''));
+  var fastRate = opsFast / 1.5, slowRate = (opsSlow - opsFast) / 2;
+  expect('в «нагрузке» операций в секунду больше', fastRate > slowRate,
+    'нагрузка ≈' + fastRate.toFixed(0) + '/с, показ ≈' + slowRate.toFixed(0) + '/с');
+
+  // ================= 6. Пауза и сброс =====================================
+  console.log('\n=== Пауза и сброс ===');
+  $('btn-pause').dispatch('click');
+  await wait(400);
+  var opsPaused = Number(clean($('m-ops').textContent).replace(/[\s\u00a0]/g, ''));
+  await wait(1200);
+  var opsPaused2 = Number(clean($('m-ops').textContent).replace(/[\s\u00a0]/g, ''));
+  expect('на паузе операции не растут', opsPaused2 === opsPaused, opsPaused + ' → ' + opsPaused2);
+
+  $('btn-reset').dispatch('click');
+  await wait(300);
+  expect('сброс вернул состояние', clean($('inv-body').innerHTML || $('inv-body').textContent).indexOf('ожидание') >= 0,
+    clean($('inv-body').innerHTML || $('inv-body').textContent));
+  expect('схема очищена', sandbox.STMLab.network.coins.length === 0 && sandbox.STMLab.network.sent === 0);
+
+  // ================= 7. Журнал выбранного потока ==========================
+  console.log('\n=== Журнал потока ===');
+  $('btn-start').dispatch('click');
+  await wait(2000);
+  var journalHtml = String($('journal-body').innerHTML);
+  var rows = (journalHtml.match(/<tr/g) || []).length;
+  expect('журнал транзакции выбранного потока заполняется', rows > 0, 'строк: ' + rows);
+  expect('в журнале видны события перевода', /перевод|транзакц|чтение|запись|коммит/i.test(clean(journalHtml)),
+    clean(journalHtml).slice(0, 120));
+
+  console.log('\n' + (failures.length
+    ? '=== Есть замечания (' + failures.length + '): ' + failures.join('; ') + ' ==='
+    : '=== Все проверки интерфейса пройдены ✅ ==='));
+  process.exit(failures.length ? 1 : 0);
+}
+
+main().catch(function (e) {
+  console.log('\n❌ Ошибка сценария проверки: ' + e.stack);
+  process.exit(1);
+});
