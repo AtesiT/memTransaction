@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Транзакционная память — интерактивный стенд</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧵</text></svg>">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <div class="logo">STM</div>
+    <div>
+      <h1>Транзакционная память — интерактивный стенд</h1>
+      <p class="sub">Лабораторная работа №1 · оптимистичная синхронизация потоков · визуализация параллелизма</p>
+    </div>
+  </div>
+  <div class="mode-box">
+    <span id="mode-badge" class="badge badge-wait">проверка окружения…</span>
+    <span id="mode-note" class="mode-note"></span>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button class="tab active" data-tab="demo1">Пример 1 · CAS-зачисление</button>
+  <button class="tab" data-tab="demo2">Пример 2 · STM-переводы</button>
+  <button class="tab" data-tab="theory">Теория</button>
+  <button class="tab" data-tab="code">Код C#</button>
+  <button class="tab" data-tab="tests">Проверка корректности</button>
+</nav>
+
+<main class="layout">
+
+  <!-- ===================== ЛЕВАЯ ПАНЕЛЬ: УПРАВЛЕНИЕ ===================== -->
+  <aside class="panel controls">
+    <h2>Параметры запуска</h2>
+
+    <div class="scene" id="scene-block">
+      <label class="lbl">Сценарий синхронизации</label>
+      <div class="chips" id="technique-chips"></div>
+      <p class="hint" id="technique-hint"></p>
+    </div>
+
+    <div class="field">
+      <label class="lbl" for="workers">Потоков: <b id="workers-val">8</b></label>
+      <input type="range" id="workers" min="2" max="16" step="1" value="8">
+      <p class="hint">Столько параллельных задач одновременно меняют одни и те же данные.</p>
+    </div>
+
+    <div class="field" id="field-work">
+      <label class="lbl" for="work">Работа внутри транзакции: <b id="work-val">260</b> мкс</label>
+      <input type="range" id="work" min="0" max="2000" step="20" value="260">
+      <p class="hint">Аналог <code>Thread.SpinWait()</code> из примера: чем дольше транзакция «думает», тем больше конфликтов.</p>
+    </div>
+
+    <div class="field">
+      <label class="lbl" for="gap">Пауза между операциями: <b id="gap-val">8</b> мс</label>
+      <input type="range" id="gap" min="0" max="40" step="1" value="8">
+      <p class="hint">Интенсивность: сколько «отдыхает» поток между операциями.</p>
+    </div>
+
+    <div class="field" id="field-speed">
+      <label class="lbl" for="speed">Скорость симулятора: <b id="speed-val">3</b> шага/такт</label>
+      <input type="range" id="speed" min="1" max="10" step="1" value="3">
+    </div>
+
+    <label class="check">
+      <input type="checkbox" id="boost" checked>
+      <span>Агрессивные конфликты (разброс времени транзакции)</span>
+    </label>
+
+    <div class="buttons">
+      <button id="btn-start" class="btn btn-primary">▶ Запустить</button>
+      <button id="btn-pause" class="btn" disabled>⏸ Пауза</button>
+      <button id="btn-reset" class="btn">⟲ Сброс</button>
+    </div>
+
+    <h2 class="mt">Показатели</h2>
+    <div class="metrics" id="metrics">
+      <div class="metric"><span>Операций</span><b id="m-ops">0</b></div>
+      <div class="metric"><span>Коммитов</span><b id="m-commits">0</b></div>
+      <div class="metric"><span>Откатов (конфликт)</span><b id="m-retries" class="warn">0</b></div>
+      <div class="metric"><span>Отказов (нет средств)</span><b id="m-aborts">0</b></div>
+      <div class="metric"><span>Операций/сек</span><b id="m-rate">0</b></div>
+      <div class="metric"><span>Эффективность</span><b id="m-efficiency" title="Доля успешных фиксаций от числа попыток">—</b></div>
+    </div>
+
+    <div class="invariant" id="invariant">
+      <div class="inv-title">Инвариант банка</div>
+      <div class="inv-body" id="inv-body">—</div>
+    </div>
+  </aside>
+
+  <!-- ===================== ПРАВАЯ ЧАСТЬ ===================== -->
+  <section class="content">
+
+    <!-- ---- Демо 1 ---- -->
+    <div class="tabpane active" id="pane-demo1">
+      <div class="grid">
+        <div class="panel span2">
+          <h2>Счёт: <span class="mono">_balance</span> <span class="tag" id="d1-tag">CAS · Interlocked.CompareExchange</span></h2>
+          <div class="accounts" id="accounts1"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- Демо 2 ---- -->
+    <div class="tabpane" id="pane-demo2">
+      <div class="grid">
+        <div class="panel span2">
+          <h2>Счета и их версии <span class="tag" id="d2-tag">STM · перевод между счетами</span></h2>
+          <div class="accounts" id="accounts2"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- Общая визуализация (для обоих демо) ---- -->
+    <div class="grid">
+      <div class="panel span2">
+        <h2>Состояние потоков <span class="tag">живые данные из общей памяти</span></h2>
+        <div class="workers" id="workers-grid"></div>
+        <div class="legend" id="worker-legend"></div>
+      </div>
+
+      <div class="panel span2">
+        <h2>Таймлайн транзакций <span class="tag">каждая попытка: чтение → вычисления → валидация → коммит</span></h2>
+        <canvas id="timeline" height="260"></canvas>
+        <div class="legend">
+          <span><i class="sw sw-read"></i>чтение счёта</span>
+          <span><i class="sw sw-compute"></i>вычисления в транзакции</span>
+          <span><i class="sw sw-validate"></i>валидация</span>
+          <span><i class="sw sw-commit"></i>коммит</span>
+          <span><i class="sw sw-conflict"></i>конфликт → откат → retry</span>
+          <span><i class="sw sw-wait"></i>ожидание блокировки</span>
+          <span><i class="sw sw-idle"></i>пауза между операциями</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Журнал выбранного потока <span class="tag">локальный лог транзакции</span></h2>
+        <div class="row">
+          <label class="lbl" for="pid-select">Поток:</label>
+          <select id="pid-select"></select>
+          <span class="mono small" id="journal-state"></span>
+        </div>
+        <table class="journal">
+          <thead><tr><th>Событие</th><th>Счёт</th><th>Значение</th><th>Версия</th></tr></thead>
+          <tbody id="journal-body"><tr><td colspan="4" class="dim">выберите поток и запустите демонстрацию</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <h2>Журнал событий <span class="tag" id="events-count">0</span></h2>
+        <div class="events" id="events"></div>
+      </div>
+    </div>
+
+    <!-- ---- Теория ---- -->
+    <div class="tabpane" id="pane-theory">
+      <div class="grid">
+        <div class="panel prose">
+          <h2>Что такое транзакционная память</h2>
+          <p>При работе с общей памятью потокам нужна синхронизация. Классические способы:
+            <b>блокировки</b> (mutex), <b>алгоритмы без блокировок</b> (lock-free, CAS) и
+            <b>транзакционная память</b>.</p>
+          <p><b>Транзакционная память</b> — технология синхронизации, которая объединяет группы инструкций
+            в атомарные транзакции. Подход <b>оптимистичный</b>: мы считаем, что потоки редко трогают одни
+            и те же данные, поэтому большинство транзакций проходит успешно. Если конфликт всё-таки возник —
+            транзакция отменяется и обычно запускается заново (retry). Блокировки, наоборот,
+            <b>пессимистичны</b>: всегда запрещают двум потокам быть в критической секции одновременно.</p>
+          <h3>Как устроена транзакция</h3>
+          <ol>
+            <li><b>Локальный журнал.</b> Поток выполняет все операции внутри транзакции в изолированном
+              пространстве: чтения запоминаются в read-set вместе с версией данных, записи попадают в write-set.
+              Остальные потоки изменений не видят.</li>
+            <li><b>Валидация.</b> При завершении система проверяет, не изменил ли кто-то те ячейки,
+              которые транзакция читала (сравниваются версии).</li>
+            <li><b>Коммит или откат.</b> Конфликтов нет — write-set применяется к общей памяти целиком.
+              Есть конфликт — откат и повтор.</li>
+          </ol>
+          <h3>Плюсы и минусы</h3>
+          <div class="two-col">
+            <ul class="pros">
+              <li>простота: целые методы заворачиваются в блок транзакции;</li>
+              <li>нет блокировок — нет взаимных блокировок (deadlock);</li>
+              <li>выше уровень параллелизма и производительность при редких конфликтах.</li>
+            </ul>
+            <ul class="cons">
+              <li>при высокой конкуренции потоки много раз перезапускаются (нагрузка на CPU);</li>
+              <li>нельзя выполнять необратимые операции (письмо, отправка e-mail, запись в файл);</li>
+              <li>сложнее отлаживать, накладные расходы на журналы.</li>
+            </ul>
+          </div>
+          <h3>Сравнение подходов</h3>
+          <table class="table">
+            <thead><tr><th>Критерий</th><th>Классический lock (пессимистичный)</th><th>Транзакционная память (оптимистичная)</th></tr></thead>
+            <tbody>
+              <tr><td>Deadlock</td><td>возможен при разном порядке захвата</td><td>невозможен в принципе</td></tr>
+              <tr><td>Без конфликтов</td><td>траты на захват/освобождение монитора</td><td>максимально быстро, без задержек</td></tr>
+              <tr><td>При высокой конкуренции</td><td>потоки встают в очередь (блокируются)</td><td>потоки часто перезапускаются (спины)</td></tr>
+              <tr><td>Масштабирование</td><td>сложно поддерживать</td><td>проще, код «чище»</td></tr>
+            </tbody>
+          </table>
+          <h3>Что именно происходит на этом стенде</h3>
+          <p>Стенд повторяет цепочку из лекции: <code>чтение → локальный журнал → валидация версий → коммит
+            или откат с повтором</code>. Важная деталь, которую видно только в реальных потоках:
+            <b>валидация и фиксация должны быть неделимы</b> (в настоящих STM для этого блокируется write-set).
+            Иначе два потока успевают провалидироваться на одной версии и оба записывают устаревшие данные —
+            инвариант банка ломается. Здесь фиксация идёт через короткий критический участок, а чтение
+            использует приём seqlock (версия → значение → версия).</p>
+        </div>
+
+        <div class="panel prose">
+          <h2>Почему в .NET нет STM «из коробки»</h2>
+          <p>В официальном рантайме .NET транзакционной памяти нет: Microsoft закрыла экспериментальный проект
+            MSR STM.NET. Поэтому в задании используются два практических варианта:</p>
+          <ol>
+            <li><b>Оптимистичная блокировка через CAS</b> — <code>Interlocked.CompareExchange</code>.
+              Это самый близкий аналог STM «из коробки» для простых типов (Пример 1).</li>
+            <li><b>Своя мини-STM</b> — транзакционные переменные <code>Transactional&lt;T&gt;</code> плюс
+              менеджер транзакций с журналом, валидацией и повтором (Пример 2). Именно так работают
+              библиотеки вроде Nito.Transactions.</li>
+          </ol>
+          <h3>Производительность и побочные эффекты</h3>
+          <p>Откат побочных эффектов невозможен: если внутри транзакции отправить письмо или записать лог,
+            при конфликте это не «откатится». Плюс ведение журналов даёт нагрузку на память и сборщик мусора.
+            Поэтому в реальных .NET-проектах чаще берут <code>ConcurrentDictionary</code>, каналы
+            <code>System.Threading.Channels</code> или модель акторов, а STM применяют точечно —
+            там, где нужны атомарные изменения нескольких связанных объектов.</p>
+          <h3>Соответствие языков</h3>
+          <table class="table">
+            <thead><tr><th>Механизм</th><th>C# / .NET</th><th>Этот стенд (JS)</th></tr></thead>
+            <tbody>
+              <tr><td>Сравнение с обменом (CAS)</td><td><code>Interlocked.CompareExchange</code></td><td><code>Atomics.compareExchange</code></td></tr>
+              <tr><td>Вращение на месте</td><td><code>Thread.SpinWait(n)</code></td><td>busy-spin по <code>performance.now()</code></td></tr>
+              <tr><td>Критическая секция</td><td><code>lock</code> / <code>Monitor</code></td><td>спин-блокировка на атомарном CAS</td></tr>
+              <tr><td>Параллельная задача</td><td><code>Task.Run</code> / <code>Task[]</code></td><td>Web Worker / worker_threads</td></tr>
+              <tr><td>Общая память потока</td><td>куча процесса</td><td><code>SharedArrayBuffer</code></td></tr>
+              <tr><td>Лог транзакции</td><td><code>Dictionary&lt;int,int&gt;</code> read/write-set</td><td>объект read-set / write-set в tm-core.js</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- Код C# ---- -->
+    <div class="tabpane" id="pane-code">
+      <div class="grid">
+        <div class="panel span2 prose">
+          <h2>Пример 1 из задания: STM-подобное изменение через CAS</h2>
+          <p>Полный аналог кода задания — безопасное изменение баланса без <code>lock</code>, через
+            оптимистичную блокировку и повтор при конфликте.</p>
+        </div>
+        <div class="panel span2">
+          <pre class="code"><code>class Account
+{
+    private int _balance;                 // общая память: меняется только атомарно
+    public int Balance =&gt; Volatile.Read(ref _balance);
+
+    public void DepositTransactional(int amount)
+    {
+        int currentBalance, newBalance;
+        do
+        {
+            // 1. «Начало транзакции»: читаем текущее состояние
+            currentBalance = Volatile.Read(ref _balance);
+
+            // 2. Вычисляем новое значение локально
+            newBalance = currentBalance + amount;
+
+            // Имитация тяжёлой работы / возможного переключения контекста
+            Thread.SpinWait(10);
+
+            // 3. Пытаемся зафиксировать (commit).
+            //    CompareExchange атомарно проверит: _balance всё ещё равен
+            //    currentBalance? Если да — запишет newBalance и вернёт старое
+            //    значение; если нет — вернёт то, что успел записать другой поток.
+        }
+        // Если вернулось НЕ currentBalance — транзакция «откатывается»
+        // и цикл идёт на новый круг (retry).
+        while (Interlocked.CompareExchange(ref _balance, newBalance, currentBalance) != currentBalance);
+    }
+}
+
+class Program
+{
+    static async Task Main()
+    {
+        var account = new Account();
+        Task[] tasks = new Task[100];
+        for (int i = 0; i &lt; tasks.Length; i++)
+            tasks[i] = Task.Run(() =&gt; account.DepositTransactional(10));
+
+        await Task.WhenAll(tasks);
+        Console.WriteLine($"Итоговый баланс: {account.Balance}");   // всегда 1000
+    }
+}</code></pre>
+        </div>
+
+        <div class="panel span2 prose">
+          <h2>Пример 2 из задания: своя STM для связанных объектов</h2>
+          <p>Одной CAS-операции мало: перевод затрагивает два счёта, и нужно, чтобы изменение обоих
+            произошло атомарно. Ниже — минимальная транзакционная память: транзакционные переменные с
+            версиями, контекст транзакции с журналом чтения/записи, валидация и повтор.</p>
+        </div>
+        <div class="panel span2">
+          <pre class="code"><code>// Транзакционная переменная: значение + версия для проверки конфликтов
+public sealed class Transactional&lt;T&gt;
+{
+    private T _value;
+    internal long Version;                       // «штамп» версии данных
+    public Transactional(T value) { _value = value; Version = 1; }
+
+    public T Read()                              // чтение внутри транзакции
+    {
+        TxContext.Current?.LogRead(this, Version);
+        return _value;
+    }
+    public void Write(T value)                   // запись только в журнал
+    {
+        TxContext.Current?.LogWrite(this, value);
+    }
+    internal T RawValue =&gt; _value;
+    internal void CommitValue(T value) { _value = value; Interlocked.Increment(ref Version); }
+}
+
+// Контекст транзакции: локальный журнал потока + фиксация
+public sealed class TxContext
+{
+    [ThreadStatic] private static TxContext _current;
+    public static TxContext Current =&gt; _current;
+
+    private readonly Dictionary&lt;object, long&gt; _readSet = new();
+    private readonly Dictionary&lt;object, object&gt; _writeSet = new();
+    private static readonly object CommitLatch = new();   // фиксация неделима
+
+    public static void ExecuteInTransaction(Action body, int maxRetries = 100)
+    {
+        for (int attempt = 1; ; attempt++)
+        {
+            var ctx = new TxContext();
+            _current = ctx;
+            body();                                   // операции пишутся в журнал
+
+            lock (CommitLatch)                        // короткий критический участок
+            {
+                if (ctx.Validate())                   // никого не обогнали?
+                {
+                    ctx.Apply();
+                    return;                           // успешная фиксация
+                }
+            }
+            if (attempt &gt;= maxRetries)
+                throw new InvalidOperationException("Слишком много конфликтов");
+            // иначе — откат и повтор целиком
+        }
+    }
+
+    private bool Validate()
+    {
+        foreach (var kv in _readSet)
+            if (VersionOf(kv.Key) != kv.Value) return false;
+        return true;
+    }
+    private void Apply()
+    {
+        foreach (var kv in _writeSet) SetValue(kv.Key, kv.Value);
+        _writeSet.Clear(); _readSet.Clear();
+    }
+}
+
+public class BankModel
+{
+    public Transactional&lt;int&gt; AccountA = new(100);
+    public Transactional&lt;int&gt; AccountB = new(50);
+
+    public void Transfer(int amount) =&gt;
+        TxContext.ExecuteInTransaction(() =&gt;
+        {
+            if (AccountA.Read() &lt; amount) throw new InvalidOperationException("Недостаточно средств");
+            AccountA.Write(AccountA.Read() - amount);
+            AccountB.Write(AccountB.Read() + amount);
+        });
+}</code></pre>
+        </div>
+        <div class="panel span2 prose">
+          <p class="note">Полный текст обеих программ (в том числе вариант под .NET MAUI с визуализацией)
+            лежит в файле <code>docs/csharp-tm.md</code> рядом с этим стендом.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- Тесты ---- -->
+    <div class="tabpane" id="pane-tests">
+      <div class="grid">
+        <div class="panel span2 prose">
+          <h2>Как проверить корректность механизма</h2>
+          <p>Стенд можно проверить автоматическими тестами — они гоняют ту же самую логику
+            (<code>js/tm-core.js</code>) без браузера, включая настоящую параллельность
+            (<code>worker_threads</code> + <code>SharedArrayBuffer</code> + <code>Atomics</code>):</p>
+          <pre class="code"><code>cd web
+node tests/tm.test.js</code></pre>
+          <p>Что именно проверяется:</p>
+          <ul>
+            <li>CAS-зачисление: ни одно пополнение не потеряно, конфликтов много;</li>
+            <li>зачисление без синхронизации: обновления теряются (демонстрация проблемы);</li>
+            <li>STM-переводы: сумма на счетах неизменна (инвариант банка);</li>
+            <li>переводы без синхронизации: инвариант нарушается;</li>
+            <li>STM + блокировки одновременно на общих данных: инвариант сохраняется;</li>
+            <li>высокая конкуренция: 16 потоков на 8 счетов;</li>
+            <li>и то же самое в <b>реальных параллельных потоках</b> — там ловятся гонки, которые
+              симулятор принципиально не воспроизводит.</li>
+          </ul>
+          <h3>Границы применимости</h3>
+          <p>Транзакция не должна выполнять необратимые действия (запись файла, отправка письма):
+            при откате их не «откатить». В реальных проектах .NET для таких задач применяют
+            Event Sourcing / Sagas, а не STM.</p>
+        </div>
+      </div>
+    </div>
+
+  </section>
+</main>
+
+<footer class="foot">
+  <span>Стенд повторяет схему из задания: CAS-цикл (Пример 1) и транзакционная память
+    с журналом и валидацией (Пример 2). Данные — <a href="js/tm-core.js">js/tm-core.js</a>.</span>
+</footer>
+
+<script src="js/tm-core.js"></script>
+<script src="js/sim-engine.js"></script>
+<script src="js/runner.js"></script>
+<script src="js/timeline.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
