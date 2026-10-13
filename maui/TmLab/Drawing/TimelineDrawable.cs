@@ -59,8 +59,10 @@ public sealed class TimelineDrawable : IDrawable
 
         _phases.Add(new Phase { WorkerId = workerId, Kind = kind, Start = now, End = now });
 
-        if (_phases.Count > 8000)
-            _phases.RemoveRange(0, 3000);
+        // Под нагрузкой фаз становится очень много: держим примерно окно показа,
+        // остальное (самое старое) выбрасываем.
+        if (_phases.Count > 40000)
+            _phases.RemoveRange(0, 20000);
     }
 
     public void AttemptBegin(int workerId, long now) =>
