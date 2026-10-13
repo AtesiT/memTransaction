@@ -143,22 +143,6 @@ select, input[type=number] {
 .invariant.bad { border-color: rgba(255,93,108,.55); background: rgba(255,93,108,.08); }
 .invariant.bad .inv-body { color: var(--err); }
 
-/* ------------------------------ счета ----------------------------------- */
-.accounts { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
-.account {
-  position: relative; background: var(--bg2); border: 1px solid var(--line);
-  border-radius: 12px; padding: 12px 14px; overflow: hidden; transition: .18s;
-}
-.account.locked { border-color: rgba(255,176,32,.6); box-shadow: 0 0 0 1px rgba(255,176,32,.2) inset; }
-.account.flash-commit { border-color: rgba(53,208,127,.7); }
-.account.flash-conflict { border-color: rgba(255,93,108,.7); }
-.acc-head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--dim); }
-.acc-balance { font-size: 23px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 4px 0 2px; }
-.acc-meta { font-size: 11.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
-.acc-bar { height: 6px; border-radius: 4px; background: #1b2745; margin-top: 8px; overflow: hidden; }
-.acc-bar i { display: block; height: 100%; background: linear-gradient(90deg, #2b6cff, #5a4bff); transition: width .18s; }
-.lock-badge { color: var(--warn); font-weight: 600; }
-
 /* ------------------------------ потоки ---------------------------------- */
 .workers { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 8px; }
 .worker {
@@ -227,6 +211,18 @@ pre.code {
 .net-caption { color: var(--dim); font-size: 12px; margin-top: 8px; }
 #net-legend { margin-top: 8px; }
 .chips .chip[data-tempo] { font-size: 12px; padding: 6px 10px; }
+.journal-switch { float: right; display: inline-flex; gap: 4px; }
+
+details.fine { margin: 4px 0 16px; border-top: 1px solid var(--line); padding-top: 10px; }
+details.fine > summary {
+  cursor: pointer; font-size: 12.5px; color: var(--accent); list-style: none; margin-bottom: 10px;
+}
+details.fine > summary::marker { content: ''; }
+details.fine > summary::before { content: '▸ '; }
+details.fine[open] > summary::before { content: '▾ '; }
+details.fine > summary:hover { text-decoration: underline; }
+.chip-sm { font-size: 11px; padding: 3px 9px; }
+.controls .field { margin-bottom: 14px; }
 .foot { padding: 18px 24px 34px; color: var(--dim); font-size: 12px; border-top: 1px solid var(--line); }
 
 /* ---------------------------- адаптивность ------------------------------- */

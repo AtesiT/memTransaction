@@ -41,9 +41,8 @@
       amount: 0,
       invariant: 'const',
       techniques: [
-        { id: T.STM, name: 'STM: транзакции', hint: 'Перевод целиком выполняется в транзакции: чтения в журнал, валидация версий, коммит. При конфликте — откат и повтор.', preset: { mix: false } },
-        { id: 99, name: 'Микс: STM + блокировки', hint: 'Половина потоков работает через транзакции, половина — через блокировки, на одних и тех же счетах. Инвариант всё равно сохраняется.', preset: { mix: true } },
-        { id: T.LOCK, name: 'Только блокировки', hint: 'Классический пессимистичный подход: счета захватываются в порядке возрастания номера (иначе был бы deadlock).', preset: { mix: false } },
+        { id: T.STM, name: 'STM: транзакции', hint: 'Перевод целиком выполняется в транзакции: чтения — в журнал, затем валидация версий и коммит. При конфликте — откат и повтор.', preset: { mix: false } },
+        { id: T.LOCK, name: 'Блокировки (lock)', hint: 'Пессимистичный подход: счета захватываются в порядке возрастания номера (иначе возможна взаимная блокировка). Потоки ждут.', preset: { mix: false } },
         { id: T.UNSAFE, name: 'Без синхронизации', hint: 'Специально сломанный режим: сумма на счетах «плывёт» на глазах — деньги теряются и появляются из ниоткуда.', preset: { mix: false } }
       ]
     }
@@ -139,6 +138,11 @@
     }
   }
 
+  /**
+   * Переключение примера. Оба примера используют общие панели визуализации
+   * (схема, потоки, таймлайн, журнал) — меняется только сценарий расчёта,
+   * поэтому отдельные «страницы» для вкладок не нужны.
+   */
   function setupTabs() {
     var tabs = document.querySelectorAll('.tab');
     for (var i = 0; i < tabs.length; i++) {
@@ -146,16 +150,9 @@
         var name = this.getAttribute('data-tab');
         for (var j = 0; j < tabs.length; j++) tabs[j].classList.remove('active');
         this.classList.add('active');
-        var panes = document.querySelectorAll('.tabpane');
-        for (var k = 0; k < panes.length; k++) panes[k].classList.remove('active');
-        $('pane-' + name).classList.add('active');
-        timeline.resize();
-
-        if (name === 'demo1' || name === 'demo2') {
-          if (S.tab !== name) {
-            S.tab = name;
-            applyDemo(name, true);
-          }
+        if (S.tab !== name) {
+          S.tab = name;
+          applyDemo(name, true);
         }
       });
     }
@@ -171,11 +168,10 @@
     S.technique = d.techniques[0].id;
     S.mix = false;
 
-    $('d1-tag').textContent = key === 'demo1' ? 'CAS · Interlocked.CompareExchange' : '';
-    $('d2-tag').textContent = key === 'demo2' ? 'STM · перевод между счетами' : '';
+    // «отказы из-за нехватки средств» бывают только в переводах
+    document.getElementById('metric-aborts').style.display = (key === 'demo2') ? '' : 'none';
 
     renderTechniqueChips();
-    buildAccounts();
     buildWorkerGrid();
     setupNetworkView();
     // Перезапуск по смене сценария: если демонстрация шла — продолжаем её
@@ -213,24 +209,30 @@
   // -------------------------------------------------------------------------
   // Разметка панелей
   // -------------------------------------------------------------------------
-  function buildAccounts() {
-    var pane = S.demo === 1 ? $('accounts1') : $('accounts2');
-    var other = S.demo === 1 ? $('accounts2') : $('accounts1');
-    other.innerHTML = '';
-    pane.innerHTML = '';
-    for (var i = 0; i < S.accounts; i++) {
-      var el = document.createElement('div');
-      el.className = 'account';
-      el.id = 'acc-' + i;
-      el.innerHTML =
-        '<div class="acc-head"><span>Счёт ' + String.fromCharCode(65 + i) + '</span>' +
-        '<span class="acc-lock" id="lock-' + i + '"></span></div>' +
-        '<div class="acc-balance" id="bal-' + i + '">—</div>' +
-        '<div class="acc-meta">версия <b id="ver-' + i + '">1</b> · <span id="share-' + i + '">—</span></div>' +
-        '<div class="acc-bar"><i id="bar-' + i + '" style="width:0%"></i></div>';
-      pane.appendChild(el);
-    }
-    accountsFlash = [];
+  /** Заголовок и подсказка схемы зависят от примера. */
+  function setupNetworkView() {
+    if (!network) return;
+    var deposit = (S.demo === 1);
+    network.workers = S.workers;
+    network.setup(deposit ? 'deposit' : 'transfer', S.accounts, S.workers);
+
+    $('net-title').innerHTML = deposit
+      ? 'Зачисление на счёт <span class="tag">потоки → одна ячейка памяти</span>'
+      : 'Переводы между счетами <span class="tag">линия = попытка транзакции</span>';
+    $('net-hint').textContent = deposit
+      ? 'Каждый кружок — поток, он пополняет один и тот же баланс. Монетка долетает до счёта только тогда, когда CompareExchange прошёл; если баланс успел измениться, монетка (красная) гаснет и операция повторяется.'
+      : 'Зелёная монетка долетела — транзакция зафиксирована, деньги у получателя. Красная погасла на полпути — конфликт версий: транзакция откатилась и будет переиграна.';
+
+    $('net-legend').innerHTML = deposit
+      ? '<span><i class="sw sw-commit"></i>CompareExchange прошёл — монетка долетела</span>' +
+        '<span><i class="sw sw-conflict"></i>конфликт: баланс изменили — повтор</span>' +
+        '<span><i class="sw sw-wait"></i>поток ждёт освобождения счёта</span>'
+      : '<span><i class="sw sw-commit"></i>перевод зафиксирован — деньги дошли</span>' +
+        '<span><i class="sw sw-conflict"></i>конфликт версий: транзакция откатилась, деньги не ушли</span>' +
+        '<span><i class="sw sw-validate"></i>отказ: недостаточно средств</span>' +
+        '<span><i class="sw sw-wait"></i>счёт заблокирован, поток ждёт</span>';
+    network.clear();
+    updateNetworkCaption();
   }
 
   function buildWorkerGrid() {
@@ -265,32 +267,7 @@
   }
 
   /** Схема переводов: в переводах — участники по кругу, в зачислении — счёт в центре. */
-  function setupNetworkView() {
-    if (!network) return;
-    var deposit = (S.demo === 1);
-    network.workers = S.workers;
-    network.setup(deposit ? 'deposit' : 'transfer', S.accounts, S.workers);
-
-    $('net-title').innerHTML = deposit
-      ? 'Зачисление на счёт <span class="tag" id="net-tag">потоки → одна ячейка памяти</span>'
-      : 'Переводы между участниками <span class="tag" id="net-tag">живая схема транзакций</span>';
-    $('net-hint').textContent = deposit
-      ? 'Кружки по краям — потоки. Монетка долетает до счёта только тогда, когда CompareExchange прошёл: если другой поток успел изменить баланс, монетка (красная) гаснет и операция повторяется.'
-      : 'Каждая линия — попытка перевода. Зелёная монетка долетает до получателя — транзакция зафиксирована; красная гаснет на полпути — конфликт версий, транзакция откатилась и будет переиграна.';
-
-    $('net-legend').innerHTML = deposit
-      ? '<span><i class="sw sw-commit"></i>CompareExchange прошёл — монетка долетела</span>' +
-        '<span><i class="sw sw-conflict"></i>конфликт: баланс изменили — повтор</span>' +
-        '<span><i class="sw sw-wait"></i>поток ждёт освобождения счёта</span>'
-      : '<span><i class="sw sw-commit"></i>перевод зафиксирован — деньги дошли</span>' +
-        '<span><i class="sw sw-conflict"></i>конфликт версий: транзакция откатилась, деньги не ушли</span>' +
-        '<span><i class="sw sw-validate"></i>отказ: недостаточно средств</span>' +
-        '<span><i class="sw sw-wait"></i>счёт заблокирован, поток ждёт</span>';
-    network.clear();
-    updateNetworkCaption();
-  }
-
-  /** Подпись под схемой: отдельно выделяем «сломанный» и смешанный режимы. */
+ /** Подпись под схемой: отдельно выделяем «сломанный» и смешанный режимы. */
   function updateNetworkCaption() {
     if (!network) return;
     var unsafe = (S.technique === T.UNSAFE);
@@ -411,7 +388,6 @@
     ['m-ops', 'm-commits', 'm-retries', 'm-aborts', 'm-rate'].forEach(function (id) { $(id).textContent = '0'; });
     $('m-efficiency').textContent = '—';
     $('events-count').textContent = '0';
-    buildAccounts();
     updateInvariant(null);
   }
 
@@ -649,46 +625,11 @@
     var snap = runner.snapshot();
     if (!snap) return;
 
-    drawAccounts(snap);
     drawNetwork(snap);
     drawWorkers(snap);
     drawMetrics(snap);
     updateInvariant(snap);
     timeline.render(S.clock || performance.now());
-  }
-
-  function drawAccounts(snap) {
-    var sum = 0;
-    for (var i = 0; i < snap.balances.length; i++) sum += snap.balances[i];
-    for (var a = 0; a < snap.balances.length; a++) {
-      var bal = $('bal-' + a);
-      if (!bal) continue;
-      bal.textContent = nf.format(snap.balances[a]) + ' ₽';
-      $('ver-' + a).textContent = snap.versions[a];
-      var share = sum > 0 ? Math.round(snap.balances[a] / sum * 100) : 0;
-      $('share-' + a).textContent = share + '% от суммы';
-      $('bar-' + a).style.width = Math.max(0, Math.min(100, share)) + '%';
-
-      var locked = runner.mem.isLocked(a);
-      var el = $('acc-' + a);
-      el.classList.toggle('locked', !!locked);
-      $('lock-' + a).innerHTML = locked ? '<span class="lock-badge">🔒 заблокирован</span>' : '';
-    }
-
-    // подсветка изменений
-    var now = performance.now();
-    var flashCommit = {}, flashConflict = {};
-    for (var f = accountsFlash.length - 1; f >= 0; f--) {
-      var fl = accountsFlash[f];
-      if (fl.until < now) { accountsFlash.splice(f, 1); continue; }
-      if (fl.kind === 'commit') flashCommit[fl.acc] = true; else flashConflict[fl.acc] = true;
-    }
-    for (var k = 0; k < snap.balances.length; k++) {
-      var el2 = $('acc-' + k);
-      if (!el2) continue;
-      el2.classList.toggle('flash-commit', !!flashCommit[k]);
-      el2.classList.toggle('flash-conflict', !!flashConflict[k]);
-    }
   }
 
   function drawNetwork(snap) {
@@ -795,6 +736,23 @@
     while (box.childNodes.length > 130) box.removeChild(box.lastChild);
   }
 
+  /** Переключатель журнала: поток событий или локальный журнал потока. */
+  function setupJournalSwitch() {
+    var chips = document.querySelectorAll('.journal-switch .chip');
+    for (var i = 0; i < chips.length; i++) {
+      (function (chip) {
+        chip.addEventListener('click', function () {
+          var mode = chip.getAttribute('data-journal');
+          for (var k = 0; k < chips.length; k++) chips[k].classList.remove('active');
+          chip.classList.add('active');
+          $('events-wrap').style.display = mode === 'events' ? '' : 'none';
+          $('worker-wrap').style.display = mode === 'worker' ? '' : 'none';
+          if (mode === 'worker') renderJournal();
+        });
+      })(chips[i]);
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Органы управления
   // -------------------------------------------------------------------------
@@ -842,6 +800,7 @@
     $('btn-reset').addEventListener('click', function () { stopRun(); clearAll(); });
 
     setupTempo();
+    setupJournalSwitch();
 
     $('pid-select').addEventListener('change', function () {
       S.selectedPid = Number(this.value);
@@ -881,7 +840,6 @@
     setupTabs();
     setupControls();
     applyDemo('demo1', false);
-    buildAccounts();
     buildWorkerGrid();
     updateInvariant(null);
 

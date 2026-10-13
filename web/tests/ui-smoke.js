@@ -101,7 +101,7 @@ function makeDom() {
     return registry.get(id);
   }
 
-  var tabs = ['demo1', 'demo2', 'theory', 'code', 'tests'].map(function (name) {
+  var tabs = ['demo1', 'demo2'].map(function (name) {
     var t = makeElement('tab-' + name, 'button');
     t.setAttribute('data-tab', name);
     return t;
@@ -114,7 +114,13 @@ function makeDom() {
     if (name === 'normal') c.classList.add('active');
     return c;
   });
-  queryGroups['.tabpane'] = ['demo1', 'demo2', 'theory', 'code', 'tests'].map(function (n) { return byId('pane-' + n); });
+  queryGroups['.journal-switch .chip'] = ['events', 'worker'].map(function (name) {
+    var c = makeElement('journal-' + name, 'button');
+    c.setAttribute('data-journal', name);
+    c.classList.add('chip');
+    if (name === 'events') c.classList.add('active');
+    return c;
+  });
 
   var doc = {
     readyState: 'complete',
@@ -171,6 +177,21 @@ async function main() {
   console.log('модули загружены: TMCore=' + !!sandbox.TMCore + ', SimEngine=' + !!sandbox.SimEngine +
     ', Runner=' + !!sandbox.Runner + ', Timeline=' + !!sandbox.Timeline + ', NetworkView=' + !!sandbox.NetworkView);
 
+  // ================= 0. Состав интерфейса ==================================
+  console.log('\n=== Состав интерфейса ===');
+  var tabEls = document.querySelectorAll('.tab');
+  expect('ровно две вкладки: Пример 1 и Пример 2', tabEls.length === 2,
+    tabEls.map(function (t) { return t.getAttribute('data-tab'); }).join(', '));
+  expect('три сценария синхронизации на вкладке', $('technique-chips').childNodes.length === 3,
+    'чипов: ' + $('technique-chips').childNodes.length);
+  expect('параметры запуска на месте', !!$('technique-chips') && !!$('workers') && !!$('tempo-chips') &&
+    !!$('btn-start') && !!$('btn-pause') && !!$('btn-reset'));
+  expect('показатели на месте', !!$('m-ops') && !!$('m-commits') && !!$('m-retries') &&
+    !!$('m-rate') && !!$('m-efficiency') && !!$('invariant'));
+  expect('визуализация на месте', !!$('network') && !!$('workers-grid') && !!$('timeline'));
+  expect('журнал на месте и переключается', !!$('events') && !!$('journal-body') &&
+    document.querySelectorAll('.journal-switch .chip').length === 2);
+
   // ================= 1. Пример 1: зачисление на счёт =======================
   console.log('\n=== Пример 1: зачисление через CAS ===');
   $('btn-start').dispatch('click');
@@ -208,7 +229,7 @@ async function main() {
 
   // ================= 3. Режим «без синхронизации» ==========================
   console.log('\n=== Режим без синхронизации ===');
-  $('technique-chips').childNodes[3].dispatch('click');   // «Без синхронизации»
+  $('technique-chips').childNodes[2].dispatch('click');   // «Без синхронизации»
   await wait(1500);
   expect('инвариант нарушается (как и должно быть без синхронизации)',
     $('invariant').className.indexOf('bad') >= 0, clean($('inv-body').innerHTML));
@@ -264,7 +285,14 @@ async function main() {
   expect('схема очищена', sandbox.STMLab.network.coins.length === 0 && sandbox.STMLab.network.sent === 0);
 
   // ================= 7. Журнал выбранного потока ==========================
-  console.log('\n=== Журнал потока ===');
+  console.log('\n=== Журнал ===');
+  var journalChips = document.querySelectorAll('.journal-switch .chip');
+  journalChips[1].dispatch('click');                 // переключаемся на «поток»
+  expect('переключатель журнала работает',
+    $('worker-wrap').style.display === '' && $('events-wrap').style.display === 'none');
+  journalChips[0].dispatch('click');                 // обратно на «транзакции»
+  expect('возврат к журналу транзакций', $('events-wrap').style.display === '');
+
   $('btn-start').dispatch('click');
   await wait(2000);
   var journalHtml = String($('journal-body').innerHTML);
