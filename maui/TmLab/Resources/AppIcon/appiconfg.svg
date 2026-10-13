@@ -1,8 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="456" height="456" viewBox="0 0 456 456">
-  <g fill="none" stroke="#4ea1ff" stroke-width="12">
-    <circle cx="228" cy="150" r="54" stroke="#35d07f"/>
-    <circle cx="228" cy="320" r="54" stroke="#4ea1ff"/>
-    <path d="M228 204 L228 266" stroke="#ffb020"/>
-  </g>
-  <circle cx="228" cy="235" r="18" fill="#ffd166"/>
+  <!-- только заливки: никаких обводок, групп и стилей — растеризуется везде -->
+  <circle cx="228" cy="150" r="62" fill="#35d07f"/>
+  <circle cx="228" cy="150" r="38" fill="#0b1220"/>
+  <circle cx="228" cy="320" r="62" fill="#4ea1ff"/>
+  <circle cx="228" cy="320" r="38" fill="#0b1220"/>
+  <rect x="218" y="196" width="20" height="78" fill="#ffb020"/>
+  <circle cx="228" cy="235" r="22" fill="#ffd166"/>
 </svg>
