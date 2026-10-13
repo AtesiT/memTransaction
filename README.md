@@ -6,7 +6,7 @@
 | Папка | Что это | Как запустить |
 |---|---|---|
 | `web/` | веб-стенд: настоящие потоки (Web Worker + `SharedArrayBuffer` + `Atomics`), либо детерминированный симулятор планировщика | `cd web && node server.js` → http://localhost:8080 |
-| `maui/` | мобильное приложение .NET MAUI: потоки `Task`, `Interlocked.CompareExchange`, транзакции на `TxContext` | `maui/TmLab.sln` в Visual Studio, либо `dotnet build -f net9.0-android` |
+| `maui/` | мобильное приложение .NET MAUI: потоки `Task`, `Interlocked.CompareExchange`, транзакции на `TxContext` | `maui/TmLab.sln` в Visual Studio, устройство **Windows Machine** → F5, либо `cd maui/TmLab && dotnet build`. По умолчанию собирается только Windows-версия (меньше качать): чтобы вернуть Android/iOS/Mac Catalyst, поставьте `<WindowsOnly>false</WindowsOnly>` в `maui/TmLab/TmLab.csproj` |
 
 Обе версии демонстрируют два примера из задания:
 

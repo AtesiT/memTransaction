@@ -15,80 +15,101 @@
 Плюс два режима для сравнения: **Блокировки** (пессимистичный подход) и
 **Без синхронизации** (специально сломанный вариант — показывает потерю денег).
 
-## Как запустить
+## Как запустить на Windows (основной путь)
 
-Нужен установленный **.NET SDK** с рабочей нагрузкой MAUI и Visual Studio 2022
-(или новее) с компонентами **«Разработка мобильных приложений»** и
-**.NET Multi-platform App UI**.
+1. Откройте `maui/TmLab.sln` в Visual Studio.
+2. В списке устройств выберите **Windows Machine** и нажмите **F5**.
+
+Проект собирается **без упаковки в MSIX** — как в новом шаблоне MAUI. Поэтому
+не нужны ни режим разработчика, ни сертификат подписи, ни отдельно установленная
+среда Windows App Runtime: MAUI сама включает `WindowsAppSDKSelfContained` и
+кладёт среду рядом с программой.
+
+Сборка из командной строки (без запуска):
 
 ```bash
-# проверка окружения
-dotnet workload list          # должна быть строка maui
-
-# установка нагрузки, если её нет
-dotnet workload install maui
-
-# сборка только под Android
 cd maui/TmLab
-dotnet build -f net9.0-android
+dotnet build
 ```
 
-В Visual Studio: открыть `maui/TmLab.sln`, выбрать устройство (Android-эмулятор
-или подключённый телефон) и нажать **F5**.
+### Два переключателя в `TmLab/TmLab.csproj`
 
-> Если установлен .NET 8, замените `9.0` на `8.0` в первых строках
-> `TmLab/TmLab.csproj` (TargetFrameworks). Проект собирается и под .NET 9, и
-> под .NET 8 — никаких внешних пакетов, кроме `Microsoft.Maui.Controls`, нет.
+| Переключатель | Значение по умолчанию | Зачем |
+|---|---|---|
+| `WindowsOnly` | `true` | собирается только Windows-версия, поэтому Visual Studio не просит ставить нагрузки `maui-android`/`maui-ios` и Android SDK с эмулятором (несколько ГБ). Поставьте `false` — вернутся Android, iOS и Mac Catalyst |
+| `DotNetVersion` | `9.0` | версия .NET. Должна совпадать с установленным SDK: посмотрите `dotnet --list-sdks`. Возможны `9.0` или `8.0` |
 
-## Запуск на Windows
+### Если рабочей нагрузки MAUI ещё нет
 
-1. Откройте `maui/TmLab.sln` в Visual Studio, в списке устройств выберите
-   **Windows Machine** и нажмите **F5**.
-2. Если Visual Studio предложит включить **режим разработчика** — согласитесь
-   (один раз, нужны права администратора). Это требование любой упакованной
-   MSIX-программы, а не этого проекта.
-3. Проект соберётся в MSIX-пакет и запустится отдельным окном.
+```bash
+dotnet workload install maui-windows
+```
 
-Что для Windows есть в проекте и зачем:
+Это в разы меньше, чем `maui`: ставится только Windows-нагрузка, без Android SDK,
+эмулятора и iOS/Mac Catalyst. Проверить, что установлено: `dotnet workload list`.
+
+### Ошибка «has exited with code 2147516566 (0x80008096)»
+
+Это **не ошибка программы**: код `0x80008096` — ответ среды выполнения, когда
+приложение не нашло подходящую версию .NET (в англоязычном окне — «You must
+install or update .NET to run this application»). Лечится одним из трёх способов,
+от самого экономного по месту на диске:
+
+1. поставить ровно ту версию .NET, которую просит окно (для запуска достаточно
+   **runtime**, а не SDK — загрузка десятки мегабайт);
+2. поставить в `TmLab/TmLab.csproj` ту версию, которая уже установлена:
+   `<DotNetVersion>8.0</DotNetVersion>` (проверить: `dotnet --list-sdks`);
+3. раскомментировать в `TmLab.csproj` свойство `SelfContained` (комментарий рядом
+   с ним): тогда приложение понесёт среду .NET с собой и вообще не будет
+   зависеть от установленных версий — одноразовая загрузка ~60 МБ в пакетах NuGet.
+
+Предложение Visual Studio «доступно обновление рабочей нагрузки .NET MAUI» можно
+спокойно отклонить: для сборки и запуска проекта обновление не требуется.
+
+### Что для Windows есть в проекте
 
 | Файл | Зачем |
 |---|---|
-| `TmLab/Properties/launchSettings.json` | профиль запуска «Windows Machine» (`commandName: MsixPackage`). Без него Visual Studio пишет: «a profile with command name MsixPackage in launchSettings.json is required» |
-| `TmLab/Platforms/Windows/Package.appxmanifest` | манифест пакета. Значки, плитки и заставку MAUI подставляет сам из `MauiIcon`/`MauiSplashScreen`: в файле для них стоят заглушки `$placeholder$`, `maui-package-name-placeholder` и `0.0.0.0` |
-| `TmLab/Platforms/Windows/app.manifest` | манифест приложения (корректность DPI на разных экранах) |
-| `TmLab.sln` | у проекта есть строки `Deploy.0` в конфигурациях решения — Visual Studio понимает, что пакет нужно разворачивать |
-| `TmLab/TmLab.csproj` | `TargetFrameworks` включает `net9.0-windows10.0.19041.0` (только при сборке на Windows), `UseWinUI` и `ApplicationManifest` для Windows |
+| `TmLab/Properties/launchSettings.json` | профиль запуска «Windows Machine» (`commandName: Project` — запуск как обычной программы, без MSIX) |
+| `TmLab/Platforms/Windows/app.manifest` | манифест приложения (корректная работа с DPI на разных экранах) |
+| `TmLab/Platforms/Windows/Package.appxmanifest` | манифест пакета для будущей публикации в Store: заглушки `$placeholder$`, `maui-package-name-placeholder`, `0.0.0.0` MAUI заменяет на заголовок, значки и версию из csproj. В режиме `WindowsPackageType=None` файл просто не используется, но пусть лежит |
+| `TmLab.sln` | у проекта есть строки `Deploy.0` в конфигурациях решения — понадобятся при упаковке в MSIX |
 
-Если после правок манифеста пакет не собирается — сделайте **Сборка → Пересобрать
-решение** (в `obj/` мог остаться старый разобранный манифест).
+Если решение когда-нибудь понадобится упаковать в MSIX (например, для Store):
+в csproj ставится `<WindowsPackageType>MSIX</WindowsPackageType>`, а в
+`launchSettings.json` — `"commandName": "MsixPackage"`; тогда потребуется режим
+разработчика (Visual Studio предложит его включить).
 
-Проверка сборки из командной строки (без запуска):
+### Мало места на диске C:
 
-```bash
-cd maui/TmLab
-dotnet build -f net9.0-windows10.0.19041.0
+Что можно освободить, по убыванию выгоды:
+
+```powershell
+# сколько занято и свободно
+Get-PSDrive C | Select-Object Used,Free
+
+# 1. Перенести кэш пакетов NuGet на другой диск, старый — очистить
+setx NUGET_PACKAGES D:\nuget
+setx TEMP D:\Temp
+setx TMP  D:\Temp
+# после этого открыть новое окно консоли и выполнить:
+dotnet nuget locals all --clear
 ```
 
-### Если нужен запуск без упаковки (MSIX не нужен)
-
-Так делает новый шаблон MAUI: приложение запускается как обычная программа, без
-режима разработчика и сертификата. Для этого нужны две правки:
-
-1. в `TmLab/TmLab.csproj` добавить свойство
-
-   ```xml
-   <WindowsPackageType>None</WindowsPackageType>
-   ```
-
-2. в `TmLab/Properties/launchSettings.json` заменить команду профиля:
-
-   ```json
-   "commandName": "Project"
-   ```
-
-В этом режиме ничего доустанавливать не нужно: если `WindowsPackageType` равно
-`None`, MAUI сам собирает приложение самодостаточным
-(`WindowsAppSDKSelfContained`), без зависимости от установленной среды выполнения.
+2. **Кэш загрузок Visual Studio** (бывает несколько ГБ): Visual Studio Installer →
+   «Изменить» → «Размещение установки» → «Кэш загрузок» → другой диск. Сразу
+   после установки/обновления его вообще можно удалить:
+   `C:\ProgramData\Microsoft\VisualStudio\Packages`.
+3. **Образы Android-эмулятора и Android SDK** — если Windows-версии достаточно,
+   они не нужны совсем: `%USERPROFILE%\.android\avd`,
+   `%LOCALAPPDATA%\Android\Sdk`, `C:\Program Files (x86)\Android\android-sdk`.
+4. **Компоненты Android в Visual Studio**: Installer → «Изменить» → у нагрузки
+   .NET MAUI снять галочки «Android SDK setup», «Android Emulator»,
+   «Intel HAXM» (и «iOS build tools», если iPhone не нужен).
+5. **`%TEMP%`** и «Очистка диска» (`cleanmgr`), плюс удаление папок
+   `bin` и `obj` этого проекта: они пересоздаются (`dotnet clean`).
+6. Сам проект удобнее держать не в `C:\Users\...\Downloads`, а на диске
+   с местом: путь значения не имеет, `bin`/`obj` перестанут занимать C:.
 
 ---
 

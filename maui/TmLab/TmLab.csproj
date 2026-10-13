@@ -1,12 +1,29 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!--
+    ДВА ПЕРЕКЛЮЧАТЕЛЯ. Менять только здесь, больше нигде ничего править не нужно.
+
+    WindowsOnly = true  — собирается только Windows-версия. Visual Studio не
+                          просит устанавливать нагрузки maui-android / maui-ios
+                          и Android SDK с эмулятором: это экономит несколько
+                          гигабайт диска. Верните false, когда снова понадобятся
+                          Android, iOS и Mac Catalyst.
+
+    DotNetVersion       — версия .NET, которая установлена на компьютере
+                          (список установленных SDK печатает команда dotnet
+                          с ключом list-sdks). Возможны 9.0 или 8.0.
+                          Если приложение просит «install or update .NET»,
+                          поставьте сюда ту версию, которую оно просит, — или
+                          выберите ту, что уже установлена.
+  -->
   <PropertyGroup>
-    <!--
-      Целевые платформы. Если у вас установлен .NET 8 (а не 9), замените 9.0 на 8.0
-      в двух строках ниже. Сборка только под Android: dotnet build -f net9.0-android
-    -->
-    <TargetFrameworks>net9.0-android;net9.0-ios;net9.0-maccatalyst</TargetFrameworks>
-    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net9.0-windows10.0.19041.0</TargetFrameworks>
+    <WindowsOnly Condition="'$(WindowsOnly)' == ''">true</WindowsOnly>
+    <DotNetVersion Condition="'$(DotNetVersion)' == ''">9.0</DotNetVersion>
+
+    <TargetFrameworks Condition="'$(WindowsOnly)' == 'true' and $([MSBuild]::IsOSPlatform('windows'))">net$(DotNetVersion)-windows10.0.19041.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(WindowsOnly)' == 'true' and !$([MSBuild]::IsOSPlatform('windows'))">net$(DotNetVersion)-android;net$(DotNetVersion)-ios;net$(DotNetVersion)-maccatalyst</TargetFrameworks>
+    <TargetFrameworks Condition="'$(WindowsOnly)' != 'true'">net$(DotNetVersion)-android;net$(DotNetVersion)-ios;net$(DotNetVersion)-maccatalyst</TargetFrameworks>
+    <TargetFrameworks Condition="'$(WindowsOnly)' != 'true' and $([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net$(DotNetVersion)-windows10.0.19041.0</TargetFrameworks>
 
     <OutputType>Exe</OutputType>
     <RootNamespace>TmLab</RootNamespace>
@@ -19,6 +36,25 @@
     <ApplicationId>com.example.tmlab</ApplicationId>
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
     <ApplicationVersion>1</ApplicationVersion>
+
+    <!--
+      Windows собирается без упаковки в MSIX — так же, как в новом шаблоне MAUI.
+      Поэтому не нужны: режим разработчика, сертификат подписи и отдельно
+      установленная среда Windows App Runtime — MAUI в этом режиме сама включает
+      WindowsAppSDKSelfContained и кладёт среду рядом с программой.
+      Package.appxmanifest при этом не удаляется: он понадобится, если проект
+      когда-нибудь будет публиковаться в Store (тогда здесь ставится MSIX).
+    -->
+    <WindowsPackageType>None</WindowsPackageType>
+
+    <!--
+      Если при запуске всё-таки появится окно «You must install or update .NET
+      to run this application», раскомментируйте строку ниже: приложение понесёт
+      среду .NET с собой и перестанет зависеть от установленных версий.
+      Одноразовая загрузка в пакетах NuGet — около 60 МБ.
+
+      <SelfContained Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">true</SelfContained>
+    -->
 
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
