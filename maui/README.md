@@ -40,6 +40,58 @@ dotnet build -f net9.0-android
 > `TmLab/TmLab.csproj` (TargetFrameworks). Проект собирается и под .NET 9, и
 > под .NET 8 — никаких внешних пакетов, кроме `Microsoft.Maui.Controls`, нет.
 
+## Запуск на Windows
+
+1. Откройте `maui/TmLab.sln` в Visual Studio, в списке устройств выберите
+   **Windows Machine** и нажмите **F5**.
+2. Если Visual Studio предложит включить **режим разработчика** — согласитесь
+   (один раз, нужны права администратора). Это требование любой упакованной
+   MSIX-программы, а не этого проекта.
+3. Проект соберётся в MSIX-пакет и запустится отдельным окном.
+
+Что для Windows есть в проекте и зачем:
+
+| Файл | Зачем |
+|---|---|
+| `TmLab/Properties/launchSettings.json` | профиль запуска «Windows Machine» (`commandName: MsixPackage`). Без него Visual Studio пишет: «a profile with command name MsixPackage in launchSettings.json is required» |
+| `TmLab/Platforms/Windows/Package.appxmanifest` | манифест пакета. Значки, плитки и заставку MAUI подставляет сам из `MauiIcon`/`MauiSplashScreen`: в файле для них стоят заглушки `$placeholder$`, `maui-package-name-placeholder` и `0.0.0.0` |
+| `TmLab/Platforms/Windows/app.manifest` | манифест приложения (корректность DPI на разных экранах) |
+| `TmLab.sln` | у проекта есть строки `Deploy.0` в конфигурациях решения — Visual Studio понимает, что пакет нужно разворачивать |
+| `TmLab/TmLab.csproj` | `TargetFrameworks` включает `net9.0-windows10.0.19041.0` (только при сборке на Windows), `UseWinUI` и `ApplicationManifest` для Windows |
+
+Если после правок манифеста пакет не собирается — сделайте **Сборка → Пересобрать
+решение** (в `obj/` мог остаться старый разобранный манифест).
+
+Проверка сборки из командной строки (без запуска):
+
+```bash
+cd maui/TmLab
+dotnet build -f net9.0-windows10.0.19041.0
+```
+
+### Если нужен запуск без упаковки (MSIX не нужен)
+
+Так делает новый шаблон MAUI: приложение запускается как обычная программа, без
+режима разработчика и сертификата. Для этого нужны две правки:
+
+1. в `TmLab/TmLab.csproj` добавить свойство
+
+   ```xml
+   <WindowsPackageType>None</WindowsPackageType>
+   ```
+
+2. в `TmLab/Properties/launchSettings.json` заменить команду профиля:
+
+   ```json
+   "commandName": "Project"
+   ```
+
+В этом режиме ничего доустанавливать не нужно: если `WindowsPackageType` равно
+`None`, MAUI сам собирает приложение самодостаточным
+(`WindowsAppSDKSelfContained`), без зависимости от установленной среды выполнения.
+
+---
+
 ## Что на экране
 
 Сверху вниз — то же, что на веб-стенде в «узкой» раскладке:

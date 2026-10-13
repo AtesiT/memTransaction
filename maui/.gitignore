@@ -4,3 +4,7 @@ obj/
 *.user
 *.suo
 .vs/
+*.pfx
+*.cer
+AppPackages/
+BundleArtifacts/
