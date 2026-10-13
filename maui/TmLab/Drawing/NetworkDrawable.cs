@@ -356,7 +356,7 @@ public sealed class NetworkDrawable : IDrawable
                 canvas.StrokeSize = 1.5f;
                 canvas.StrokeDashPattern = new[] { 4f, 4f };
                 canvas.DrawCircle(center.X, center.Y, radius + 7);
-                canvas.StrokeDashPattern = null;
+                canvas.StrokeDashPattern = null!;      // снова сплошная линия
             }
 
             canvas.FontColor = Color.FromArgb("#e6ecf7");

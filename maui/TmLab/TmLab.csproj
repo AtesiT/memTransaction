@@ -9,16 +9,17 @@
                           гигабайт диска. Верните false, когда снова понадобятся
                           Android, iOS и Mac Catalyst.
 
-    DotNetVersion       — версия .NET, которая установлена на компьютере
-                          (список установленных SDK печатает команда dotnet
-                          с ключом list-sdks). Возможны 9.0 или 8.0.
-                          Если приложение просит «install or update .NET»,
-                          поставьте сюда ту версию, которую оно просит, — или
-                          выберите ту, что уже установлена.
+    DotNetVersion       — версия .NET, установленная на компьютере.
+                          Список SDK печатает команда dotnet с ключом list-sdks,
+                          список нагрузок — dotnet workload list. Ставить сюда
+                          нужно ту версию, для которой в списке нагрузок есть
+                          maui-windows (или maui). Возможны 10.0, 9.0 или 8.0.
+                          Если приложение просит «install or update .NET» —
+                          значит, здесь указана версия, которой на компьютере нет.
   -->
   <PropertyGroup>
     <WindowsOnly Condition="'$(WindowsOnly)' == ''">true</WindowsOnly>
-    <DotNetVersion Condition="'$(DotNetVersion)' == ''">9.0</DotNetVersion>
+    <DotNetVersion Condition="'$(DotNetVersion)' == ''">10.0</DotNetVersion>
 
     <TargetFrameworks Condition="'$(WindowsOnly)' == 'true' and $([MSBuild]::IsOSPlatform('windows'))">net$(DotNetVersion)-windows10.0.19041.0</TargetFrameworks>
     <TargetFrameworks Condition="'$(WindowsOnly)' == 'true' and !$([MSBuild]::IsOSPlatform('windows'))">net$(DotNetVersion)-android;net$(DotNetVersion)-ios;net$(DotNetVersion)-maccatalyst</TargetFrameworks>
@@ -51,13 +52,14 @@
       Если при запуске всё-таки появится окно «You must install or update .NET
       to run this application», раскомментируйте строку ниже: приложение понесёт
       среду .NET с собой и перестанет зависеть от установленных версий.
-      Одноразовая загрузка в пакетах NuGet — около 60 МБ.
+      Одноразовая загрузка в пакетах NuGet — около 60 МБ. Сборка при этом
+      работает на любой установленной версии .NET подходящего диапазона.
 
       <SelfContained Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">true</SelfContained>
     -->
 
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
-    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">17.0</SupportedOSPlatformVersion>
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
   </PropertyGroup>
