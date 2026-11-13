@@ -84,6 +84,12 @@
                       MinimumTrackColor="#2b6cff" MaximumTrackColor="#22304f"
                       ValueChanged="OnWorkersChanged" />
 
+              <Label x:Name="StartAmountLabel" Text="Стартовая сумма на счёте: 100 000 ₽"
+                     TextColor="#8fa3c4" FontSize="12" />
+              <Slider x:Name="StartAmountSlider" Minimum="10000" Maximum="500000" Value="100000"
+                      MinimumTrackColor="#2b6cff" MaximumTrackColor="#22304f"
+                      ValueChanged="OnStartAmountChanged" />
+
               <!-- потолок перевода: только для Примера 2 (видимость — в ApplyDemoUi) -->
               <VerticalStackLayout x:Name="LimitBlock" Spacing="0" IsVisible="False">
                 <Label x:Name="LimitLabel" Text="Потолок перевода: 20 000 ₽"
@@ -110,6 +116,12 @@
                 <Label Text="пополнения генерируются от 100 до 10 000 ₽; больше потолка или лимита баланса — отказ"
                        TextColor="#6d80a3" FontSize="11" />
               </VerticalStackLayout>
+
+              <HorizontalStackLayout Spacing="8">
+                <Switch x:Name="CeilingSwitch" OnColor="#2b6cff" Toggled="OnCeilingToggled" />
+                <Label Text="Клиенты не превышают потолок (суммы генерируются в его пределах)"
+                       TextColor="#8fa3c4" FontSize="12" VerticalOptions="Center" />
+              </HorizontalStackLayout>
 
               <HorizontalStackLayout Spacing="8">
                 <Switch x:Name="BoostSwitch" IsToggled="True" OnColor="#2b6cff" />

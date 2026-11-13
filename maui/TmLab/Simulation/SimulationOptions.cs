@@ -62,6 +62,12 @@ public sealed class SimulationOptions
     public int TransferLimit { get; set; } = 20_000;
 
     /// <summary>
+    /// «Аккуратные клиенты»: суммы генерируются сразу в пределах потолка, поэтому
+    /// отказов по потолку не возникает — никто даже не пытается перевести больше.
+    /// </summary>
+    public bool RespectCeiling { get; set; }
+
+    /// <summary>
     /// Пауза между операциями, мс: чем больше, тем спокойнее и нагляднее показ.
     /// Меняется на ходу.
     /// </summary>

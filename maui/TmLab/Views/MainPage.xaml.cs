@@ -157,7 +157,7 @@ public partial class MainPage : ContentPage
         LeftStack.Children.Clear();
         RightStack.Children.Clear();
         RightStack.IsVisible = wide;
-        LeftStack.WidthRequest = wide ? 380 : -1;
+        LeftStack.WidthRequest = wide ? 460 : -1;
 
         View[] left = wide
             ? new View[] { DemoSwitchPanel, ParamsBlock, MetricsPanel, InvariantPanel, ControlsBlock }
@@ -198,7 +198,12 @@ public partial class MainPage : ContentPage
     private void OnTimerTick(object? sender, EventArgs e)
     {
         if (_runner is null)
+        {
+            // Раннер не запущен (до первого запуска или после сброса): схему всё
+            // равно перерисовываем, иначе после смены примера видна старая картинка.
+            NetworkView.Invalidate();
             return;
+        }
 
         DrainEvents();
 
@@ -712,6 +717,10 @@ public partial class MainPage : ContentPage
         LimitBlock.IsVisible = !first;      // потолок перевода нужен только в Примере 2
         DepositLimitBlock.IsVisible = first; // ограничения пополнения — только в Примере 1
 
+        // У каждого примера свой масштаб стартовой суммы: выставляем ползунок
+        // (обработчик сам обновит подпись; перезапуск сделает SwitchDemo).
+        StartAmountSlider.Value = first ? 100_000 : 250_000;
+
         _network.IsDepositDemo = first;
         _network.Caption = string.Empty;
         _network.CaptionColor = Color.FromArgb("#6d80a3");
@@ -865,6 +874,28 @@ public partial class MainPage : ContentPage
             _runner.Options.BalanceCap = value;      // действует сразу, без перезапуска
     }
 
+    private void OnStartAmountChanged(object? sender, ValueChangedEventArgs e)
+    {
+        int value = (int)Math.Round(e.NewValue);
+
+        if (StartAmountLabel is not null)
+        {
+            StartAmountLabel.Text = _demo == 1
+                ? $"Стартовая сумма на счёте: {value:N0} ₽"
+                : $"Стартовая сумма на счёте: {value:N0} ₽ (всего {value * 4:N0} ₽)";
+        }
+
+        // Стартовая сумма задаёт начальное состояние банка — нужен перезапуск.
+        if (_runner is { IsRunning: true })
+            StartNewRun();
+    }
+
+    private void OnCeilingToggled(object? sender, ToggledEventArgs e)
+    {
+        if (_runner is not null)
+            _runner.Options.RespectCeiling = e.Value;   // действует сразу, без перезапуска
+    }
+
     private void OnWorkChanged(object? sender, ValueChangedEventArgs e)
     {
         int value = (int)Math.Round(e.NewValue);
@@ -971,7 +1002,7 @@ public partial class MainPage : ContentPage
             Technique = _technique,
             Workers = _workers,
             Accounts = _demo == 1 ? 1 : 4,
-            Total = _demo == 1 ? 100_000 : 1_000_000,
+            Total = CurrentStartTotal(),
             MinDeposit = 100,
             MaxDeposit = 10_000,
             DepositLimit = (int)Math.Round(DepositLimitSlider.Value),
@@ -981,7 +1012,8 @@ public partial class MainPage : ContentPage
             TransferLimit = (int)Math.Round(LimitSlider.Value),
             GapMs = (int)Math.Round(GapSlider.Value),
             WorkMicroseconds = (int)Math.Round(WorkSlider.Value),
-            AggressiveConflicts = BoostSwitch.IsToggled
+            AggressiveConflicts = BoostSwitch.IsToggled,
+            RespectCeiling = CeilingSwitch.IsToggled
         };
 
         _runner = new SimulationRunner(options);
@@ -1029,10 +1061,14 @@ public partial class MainPage : ContentPage
     }
 
     /// <summary>Привести схему, показатели и журнал к исходному виду.</summary>
+    /// <summary>Общая стартовая сумма: ползунок задаёт сумму на одном счёте.</summary>
+    private int CurrentStartTotal() =>
+        (int)Math.Round(StartAmountSlider.Value) * (_demo == 1 ? 1 : 4);
+
     private void ResetVisuals()
     {
         int accounts = _demo == 1 ? 1 : 4;
-        int total = _demo == 1 ? 100_000 : 1_000_000;
+        int total = CurrentStartTotal();
 
         _network.Setup(accounts, total);
         _network.Workers = _workers;
