@@ -844,6 +844,8 @@ public partial class MainPage : ContentPage
 
         if (_runner is { IsRunning: true })
             StartNewRun();
+        else
+            ResetVisuals();                            // карточки потоков обновляются сразу
     }
 
     private void OnLimitChanged(object? sender, ValueChangedEventArgs e)
@@ -890,9 +892,13 @@ public partial class MainPage : ContentPage
                 : $"Стартовая сумма на счёте: {value:N0} ₽ (всего {value * 4:N0} ₽)";
         }
 
-        // Стартовая сумма задаёт начальное состояние банка — нужен перезапуск.
+        // Стартовая сумма задаёт начальное состояние банка. Если демонстрация
+        // идёт — перезапускаем её; если стоит — сразу обновляем превью на схеме,
+        // чтобы новый остаток было видно без нажатия «Запустить».
         if (_runner is { IsRunning: true })
             StartNewRun();
+        else
+            ResetVisuals();
     }
 
     private void OnCeilingToggled(object? sender, ToggledEventArgs e)
