@@ -94,15 +94,16 @@ def figure_transfer(path="img/fig2-transfer.png"):
     d = ImageDraw.Draw(im)
     d.rectangle((12, 12, W - 12, H - 12), outline=BORDER, width=3)
     d.text((44, 30), "Переводы между счетами: линия — попытка транзакции", font=font(27, True), fill=TEXT)
-    d.text((44, 72), "зелёная монетка долетела — транзакция зафиксирована;   "
-                     "красная погасла на полпути — конфликт версий и откат", font=font(18), fill=MUTED)
+    d.text((44, 72), "зелёная долетела — транзакция зафиксирована;   "
+                     "красная погасла на полпути — конфликт версий и откат;   "
+                     "серая не стартовала — отказ", font=font(18), fill=MUTED)
 
     R = 84
     pts = {
-        "Аня":   (300, 300, 3100, 4, False),
-        "Борис": (900, 300, 2400, 7, False),
-        "Вика":  (300, 600, 2900, 3, False),
-        "Гриша": (900, 600, 1600, 5, True),
+        "Аня":   (300, 300, 310000, 4, False),
+        "Борис": (900, 300, 240000, 7, False),
+        "Вика":  (300, 600, 290000, 3, False),
+        "Гриша": (900, 600, 160000, 5, True),
     }
 
     def edge(p1, p2):
@@ -148,10 +149,20 @@ def figure_transfer(path="img/fig2-transfer.png"):
         d.text((bx + 10, by + 16), txt, font=f, fill=col, anchor="lm")
 
     # кто кому переводит: две успешные и две откатившиеся попытки
-    flight("Аня", "Борис", 1.0, True, 1200, bend=30)
-    flight("Борис", "Гриша", 0.62, True, 300, bend=40)
-    flight("Вика", "Аня", 0.5, False, 800, bend=-60)
-    flight("Гриша", "Вика", 0.42, False, 1500, bend=-70)
+    flight("Аня", "Борис", 1.0, True, 12000, bend=30)
+    flight("Борис", "Гриша", 0.62, True, 3000, bend=40)
+    flight("Вика", "Аня", 0.5, False, 8000, bend=-60)
+    flight("Гриша", "Вика", 0.42, False, 15000, bend=-70)
+
+    # серая монетка: перевод отклонён по потолку и даже не стартовал
+    gx, gy = pts["Вика"][0] + R + 26, pts["Вика"][1] + 30
+    d.ellipse((gx - 13, gy - 13, gx + 13, gy + 13), fill="#6d80a3", outline=BG, width=3)
+    txt = "35 000 ₽ — отказ: потолок"
+    f = font(19, True)
+    tw = d.textlength(txt, font=f)
+    bx, by = gx + 22, gy - 16
+    rr(d, (bx, by, bx + tw + 20, by + 32), 8, fill=CARD, outline="#6d80a3", width=2)
+    d.text((bx + 10, by + 16), txt, font=f, fill="#9fb2d4", anchor="lm")
 
     for name, (cx, cy, bal, ver, locked) in pts.items():
         d.ellipse((cx - R, cy - R, cx + R, cy + R), fill=CARD, outline=ACCENT, width=5)
@@ -162,8 +173,8 @@ def figure_transfer(path="img/fig2-transfer.png"):
         ctext(d, cx, cy + 24, f"{bal:,} ₽".replace(",", " "), font(20), MUTED)
         d.text((cx + R - 34, cy - R + 8), f"v{ver}", font=font(19, True), fill=CYAN)
 
-    d.text((44, H - 74), "Сумма на счетах: 10 000 ₽ — не изменилась ✔", font=font(23, True), fill=GREEN)
-    d.text((W - 470, H - 70), "откатов: 2   ·   операций/с: 20", font=font(20), fill=MUTED)
+    d.text((44, H - 74), "Сумма на счетах: 1 000 000 ₽ — не изменилась ✔", font=font(23, True), fill=GREEN)
+    d.text((W - 520, H - 70), "откатов: 2   ·   отказов: 1   ·   операций/с: 20", font=font(20), fill=MUTED)
     im.save(path)
     print("готово:", path, im.size)
 
@@ -193,7 +204,7 @@ def figure_screen(path="img/fig3-screen.png"):
     rr(d, (L, y, L + 756, y + 48), 10, fill="#16213c")
     d.text((L + 24, y + 13), "▾ Параметры запуска", font=font(20), fill=CYAN)
     y += 66
-    d.text((L, y), "сценарий · темп показа · потоки · работа · пауза",
+    d.text((L, y), "сценарий · темп показа · потоки · работа · пауза · потолок перевода",
            font=font(17), fill=MUTED)
     y += 40
 
@@ -210,7 +221,7 @@ def figure_screen(path="img/fig3-screen.png"):
 
     # 5. инвариант
     rr(d, (L, y, L + 756, y + 56), 10, fill="#0f2a22", outline=GREEN, width=3)
-    d.text((L + 24, y + 15), "Сумма на счетах 10 000 ₽ — не изменилась ✔", font=font(21, True), fill=GREEN)
+    d.text((L + 24, y + 15), "Сумма на счетах 1 000 000 ₽ — не изменилась ✔", font=font(21, True), fill=GREEN)
     y += 76
 
     # 8. управление (значки рисуем сами: в шрифте отчёта нет символа паузы)
@@ -241,10 +252,10 @@ def figure_screen(path="img/fig3-screen.png"):
     rr(d, (rx, ry, W - 48, ry + sch_h), 14, fill=PANEL, outline=BORDER, width=3)
     d.text((rx + 26, ry + 16), "Переводы между счетами", font=font(20), fill=MUTED)
 
-    nodes = {"Аня": (rx + 175, ry + 205, "2 860 ₽", 4, False),
-             "Борис": (rx + 440, ry + 205, "2 400 ₽", 7, False),
-             "Вика": (rx + 175, ry + 355, "2 640 ₽", 3, False),
-             "Гриша": (rx + 440, ry + 355, "2 100 ₽", 5, True)}
+    nodes = {"Аня": (rx + 175, ry + 205, "286 000 ₽", 4, False),
+             "Борис": (rx + 440, ry + 205, "240 000 ₽", 7, False),
+             "Вика": (rx + 175, ry + 355, "264 000 ₽", 3, False),
+             "Гриша": (rx + 440, ry + 355, "210 000 ₽", 5, True)}
     R = 58
     for name, (cx, cy, bal, ver, locked) in nodes.items():
         d.ellipse((cx - R, cy - R, cx + R, cy + R), fill=CARD, outline=ACCENT, width=4)
