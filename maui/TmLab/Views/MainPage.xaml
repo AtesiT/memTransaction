@@ -43,7 +43,9 @@
                   BackgroundColor="#16213c" TextColor="#4ea1ff"
                   FontSize="13" CornerRadius="8" />
 
-          <ScrollView x:Name="ParamsPanel" MaximumHeightRequest="300">
+          <!-- высота панели задаётся в ApplyAdaptiveLayout: она занимает
+               оставшееся место в левой колонке, чтобы не скроллиться внутри себя -->
+          <ScrollView x:Name="ParamsPanel">
             <VerticalStackLayout Spacing="8">
 
               <Label Text="Сценарий синхронизации" TextColor="#8fa3c4" FontSize="12" />
