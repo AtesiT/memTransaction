@@ -823,7 +823,7 @@ public partial class MainPage : ContentPage
         active.BackgroundColor = Color.FromArgb("#2b6cff");
         active.TextColor = Colors.White;
 
-        _timeline.SetWindow(preset.GapMs >= 700 ? 18000 : preset.GapMs >= 250 ? 12000 : 7000);
+        _timeline.SetWindow(preset.GapMs >= 1500 ? 30000 : preset.GapMs >= 700 ? 18000 : preset.GapMs >= 250 ? 12000 : 7000);
     }
 
     private void OnParamsToggleClicked(object? sender, EventArgs e)
@@ -947,7 +947,7 @@ public partial class MainPage : ContentPage
             _runner.Options.GapMs = value;
 
         // окно таймлайна подстраиваем под темп: на медленном видно больше истории
-        _timeline.SetWindow(value >= 700 ? 18000 : value >= 250 ? 12000 : 7000);
+        _timeline.SetWindow(value >= 1500 ? 30000 : value >= 700 ? 18000 : value >= 250 ? 12000 : 7000);
     }
 
     private void OnPanelWorkersClicked(object? sender, EventArgs e) => ShowPanel("workers");

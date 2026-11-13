@@ -72,7 +72,7 @@
                      TextColor="#6d80a3" FontSize="11" />
 
               <Label x:Name="GapLabel" Text="Скорость: обычная" TextColor="#8fa3c4" FontSize="12" />
-              <Slider x:Name="GapSlider" Minimum="0" Maximum="1500" Value="400"
+              <Slider x:Name="GapSlider" Minimum="0" Maximum="3000" Value="400"
                       MinimumTrackColor="#2b6cff" MaximumTrackColor="#22304f"
                       ValueChanged="OnGapChanged" />
 

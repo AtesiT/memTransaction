@@ -86,7 +86,7 @@ public sealed class SimulationOptions
     // --- готовые темпы показа ----------------------------------------------
 
     /// <summary>Медленно: каждый перевод видно по отдельности.</summary>
-    public static SimulationOptions Show => new() { GapMs = 1000, WorkMicroseconds = 1500 };
+    public static SimulationOptions Show => new() { GapMs = 2000, WorkMicroseconds = 2500 };
 
     /// <summary>Обычный темп для наблюдения.</summary>
     public static SimulationOptions Normal => new() { GapMs = 400, WorkMicroseconds = 600 };
