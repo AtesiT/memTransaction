@@ -74,6 +74,15 @@
     <ApplicationManifest>Platforms\Windows\app.manifest</ApplicationManifest>
   </PropertyGroup>
 
+  <!-- Отключаем Fast Deployment для Android: в этом режиме runtime не должен
+       искать assemblies во временной папке __override__. В частности, это
+       предотвращает аварийное завершение при запуске APK, где native libs
+       запакованы как сжатые ZIP entries (требуются STORED entries). -->
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+    <AndroidUseFastDeployment>false</AndroidUseFastDeployment>
+    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+  </PropertyGroup>
+
   <ItemGroup>
     <!-- Значки и заставка приложения -->
     <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#0b1220" />
