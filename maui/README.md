@@ -40,7 +40,9 @@ dotnet build
    development» в Visual Studio) и запустите эмулятор
    (Tools → Android Emulator Manager) или подключите телефон с отладкой по USB.
 2. Запустите `maui\build-android.cmd` — он проверит устройства, соберёт проект
-   под Android, установит приложение и запустит его.
+   под Android, установит приложение и запустит его. А `maui\build-android-apk.cmd`
+   только собирает APK-файл (`TmLab/bin/Debug/net10.0-android/TmLab.apk`) —
+   его можно скинуть на телефон и установить вручную, без эмулятора.
 
 Или в Visual Studio: поставьте `WindowsOnly=false` в `TmLab/TmLab.csproj`
 и выберите устройство Android в списке вместо Windows Machine.
