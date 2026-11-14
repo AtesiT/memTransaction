@@ -38,14 +38,14 @@
         <!-- ===== 2. Параметры запуска (свёрнуты) ===== -->
         <VerticalStackLayout x:Name="ParamsBlock" Spacing="6">
           <Button x:Name="ParamsToggleButton"
-                  Text="▾ Параметры запуска"
+                  Text="▸ Параметры запуска"
                   Clicked="OnParamsToggleClicked"
                   BackgroundColor="#16213c" TextColor="#4ea1ff"
                   FontSize="13" CornerRadius="8" />
 
           <!-- высота панели задаётся в ApplyAdaptiveLayout: она занимает
                оставшееся место в левой колонке, чтобы не скроллиться внутри себя -->
-          <ScrollView x:Name="ParamsPanel">
+          <ScrollView x:Name="ParamsPanel" IsVisible="False">
             <VerticalStackLayout Spacing="8">
 
               <Label Text="Сценарий синхронизации" TextColor="#8fa3c4" FontSize="12" />
