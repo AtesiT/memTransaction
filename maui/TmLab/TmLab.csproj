@@ -7,7 +7,8 @@
                           просит устанавливать нагрузки maui-android / maui-ios
                           и Android SDK с эмулятором: это экономит несколько
                           гигабайт диска. Верните false, когда снова понадобятся
-                          Android, iOS и Mac Catalyst.
+                          Android, iOS и Mac Catalyst. На Linux собирается только
+                          Android (iOS и Mac Catalyst всё равно требуют macOS).
 
     DotNetVersion       — версия .NET, установленная на компьютере.
                           Список SDK печатает команда dotnet с ключом list-sdks,
@@ -25,6 +26,9 @@
     <TargetFrameworks Condition="'$(WindowsOnly)' == 'true' and !$([MSBuild]::IsOSPlatform('windows'))">net$(DotNetVersion)-android;net$(DotNetVersion)-ios;net$(DotNetVersion)-maccatalyst</TargetFrameworks>
     <TargetFrameworks Condition="'$(WindowsOnly)' != 'true'">net$(DotNetVersion)-android;net$(DotNetVersion)-ios;net$(DotNetVersion)-maccatalyst</TargetFrameworks>
     <TargetFrameworks Condition="'$(WindowsOnly)' != 'true' and $([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net$(DotNetVersion)-windows10.0.19041.0</TargetFrameworks>
+    <!-- Linux: только Android. iOS и Mac Catalyst собираются на macOS, а их
+         пакеты на Linux недоступны — иначе восстановление падает с NETSDK1178. -->
+    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('linux'))">net$(DotNetVersion)-android</TargetFrameworks>
 
     <OutputType>Exe</OutputType>
     <RootNamespace>TmLab</RootNamespace>
