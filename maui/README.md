@@ -43,6 +43,8 @@ dotnet build
    под Android, установит приложение и запустит его. А `maui\build-android-apk.cmd`
    только собирает APK-файл (`TmLab/bin/Debug/net10.0-android/com.example.tmlab-Signed.apk`) —
    его можно скинуть на телефон и установить вручную, без эмулятора.
+   На Linux те же действия делают скрипты `maui/build-android.sh` и
+   `maui/build-android-apk.sh` (нужны .NET SDK 10.0 и `dotnet workload install maui-android`).
 
 Или в Visual Studio: поставьте `WindowsOnly=false` в `TmLab/TmLab.csproj`
 и выберите устройство Android в списке вместо Windows Machine.
