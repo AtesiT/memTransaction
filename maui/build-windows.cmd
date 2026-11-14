@@ -60,6 +60,8 @@ echo.
 echo.
 echo App closed with exit code %ERRORLEVEL%.
 echo Full build log: %ROOT%build-log.txt
+echo.
+pause
 exit /b 0
 
 :failed
@@ -71,4 +73,6 @@ echo.
 echo --------------------------------------------------------------------
 echo Send the lines that contain "error" to the assistant.
 echo Full log kept here: %ROOT%build-log.txt
+echo.
+pause
 exit /b 1

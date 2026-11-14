@@ -35,6 +35,8 @@ if not exist "%APK%" (
   echo [ERROR] APK not found: %APK%
   echo APK files in bin:
   dir /s /b "bin\*.apk"
+  echo.
+  pause
   exit /b 1
 )
 
@@ -49,6 +51,8 @@ echo you use to open the file (browser, file manager, messenger).
 echo.
 echo Opening the folder with the APK...
 start "" "%ROOT%TmLab\bin\Debug\net10.0-android"
+echo.
+pause
 exit /b 0
 
 :failed
@@ -58,4 +62,6 @@ echo.
 echo If the error mentions a missing SDK or workload, check
 echo "dotnet workload list" - the "android" workload and the
 echo Android SDK must be installed.
+echo.
+pause
 exit /b 1

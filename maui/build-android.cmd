@@ -35,6 +35,8 @@ if not defined ADB (
   echo Install the Android SDK: Visual Studio Installer -^> modify -^>
   echo ".NET Multi-platform App UI development" workload includes it,
   echo or install Android Studio. Then run this script again.
+  echo.
+  pause
   exit /b 1
 )
 echo adb: %ADB%
@@ -52,6 +54,8 @@ if errorlevel 1 (
   echo     or Android Studio -^> AVD Manager;
   echo   - phone: enable USB debugging, connect by cable, accept the prompt
   echo     on the phone screen.
+  echo.
+  pause
   exit /b 1
 )
 
@@ -64,8 +68,11 @@ if errorlevel 1 (
   echo [ERROR] dotnet run failed. If the error mentions a missing SDK or
   echo workload, check "dotnet workload list" - the "android" workload and
   echo the Android SDK must be installed.
+  echo.
+  pause
   exit /b 1
 )
 echo.
 echo Done.
+pause
 exit /b 0
