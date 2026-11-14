@@ -12,7 +12,7 @@ rem ============================================================================
 
 setlocal
 set "ROOT=%~dp0"
-cd /d "%ROOT%TmLab" || (echo [ERROR] Project folder not found: %ROOT%TmLab & exit /b 1)
+cd /d "%ROOT%TmLab" || (echo [ERROR] Project folder not found: %ROOT%TmLab & pause & exit /b 1)
 
 echo ==== 1/5  what is installed ====
 echo.
