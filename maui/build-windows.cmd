@@ -1,8 +1,8 @@
 @echo off
 rem ============================================================================
-rem  TmLab: clean build for Windows.
-rem  Cleans bin and obj, restores packages, builds the Windows target and
-rem  saves the full log to maui\build-log.txt
+rem  TmLab: clean build for Windows, then LAUNCH the app.
+rem  Cleans bin and obj, restores packages, builds the Windows target,
+rem  saves the full log to maui\build-log.txt and starts the app.
 rem
 rem  Usage: double-click this file, or run it from the command line:
 rem      C:\...\memTransaction\maui\build-windows.cmd
@@ -45,14 +45,21 @@ if errorlevel 1 goto failed
 echo build: OK
 
 echo.
-echo ==== 5/5  result ====
+echo ==== 5/5  launching the app ====
+set "EXE=bin\Debug\net10.0-windows10.0.19041.0\win-x64\TmLab.exe"
+if not exist "%EXE%" (
+  echo [ERROR] Executable not found: %EXE%
+  echo Built executables:
+  dir /s /b "bin\*.exe"
+  exit /b 1
+)
+echo Starting: %EXE%
+echo (close the app window to return here)
 echo.
-echo Built executables:
-dir /s /b "bin\*.exe"
+"%EXE%"
 echo.
-echo Full log: %ROOT%build-log.txt
-echo.
-echo Now open maui\TmLab.sln, choose "Windows Machine" and press F5.
+echo App closed with exit code %ERRORLEVEL%.
+echo Full build log: %ROOT%build-log.txt
 exit /b 0
 
 :failed
