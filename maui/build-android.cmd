@@ -31,10 +31,12 @@ if not defined ADB if defined ANDROID_HOME if exist "%ANDROID_HOME%\platform-too
 if not defined ADB if defined ANDROID_SDK_ROOT if exist "%ANDROID_SDK_ROOT%\platform-tools\adb.exe" set "ADB=%ANDROID_SDK_ROOT%\platform-tools\adb.exe"
 
 if not defined ADB (
-  echo [ERROR] adb was not found.
-  echo Install the Android SDK: Visual Studio Installer -^> modify -^>
-  echo ".NET Multi-platform App UI development" workload includes it,
-  echo or install Android Studio. Then run this script again.
+  echo [ERROR] Android SDK was not found (adb is missing, error XA5300).
+  echo Install the Android SDK: Visual Studio Installer -^> Modify -^>
+  echo make sure the ".NET Multi-platform App UI development" workload
+  echo is installed - it includes the Android SDK. Then run this script
+  echo again. Or install the Android command-line tools manually and
+  echo set the ANDROID_HOME environment variable to the SDK folder.
   echo.
   pause
   exit /b 1
