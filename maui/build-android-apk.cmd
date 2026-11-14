@@ -30,22 +30,22 @@ set "SDK="
 if defined ANDROID_HOME if exist "%ANDROID_HOME%\platform-tools\adb.exe" set "SDK=%ANDROID_HOME%"
 if not defined SDK if defined ANDROID_SDK_ROOT if exist "%ANDROID_SDK_ROOT%\platform-tools\adb.exe" set "SDK=%ANDROID_SDK_ROOT%"
 if not defined SDK if exist "%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe" set "SDK=%LOCALAPPDATA%\Android\Sdk"
-if not defined SDK (
-  echo [ERROR] Android SDK was not found (error XA5300).
-  echo The "android" workload is installed, but the Android SDK itself
-  echo (platform-tools, platforms, build-tools) is missing.
-  echo.
-  echo Install it: Visual Studio Installer -^> Modify -^> make sure the
-  echo ".NET Multi-platform App UI development" workload is installed -
-  echo it includes the Android SDK. Then run this script again.
-  echo.
-  echo Or install the Android command-line tools manually from
-  echo https://developer.android.com/studio#command-line-tools-only
-  echo and set the ANDROID_HOME environment variable to the SDK folder.
-  echo.
-  pause
-  exit /b 1
-)
+if defined SDK goto sdk_found
+echo [ERROR] Android SDK was not found (error XA5300).
+echo The "android" workload is installed, but the Android SDK itself
+echo - platform-tools, platforms, build-tools - is missing.
+echo.
+echo Install it: Visual Studio Installer -^> Modify -^> make sure the
+echo ".NET Multi-platform App UI development" workload is installed -
+echo it includes the Android SDK. Then run this script again.
+echo.
+echo Or install the Android command-line tools manually from
+echo https://developer.android.com/studio#command-line-tools-only
+echo and set the ANDROID_HOME environment variable to the SDK folder.
+echo.
+pause
+exit /b 1
+:sdk_found
 echo Android SDK: %SDK%
 
 echo.
