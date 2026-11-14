@@ -1,7 +1,7 @@
 @echo off
 rem ============================================================================
 rem  TmLab: build an Android APK file (no device needed).
-rem  The APK is created in TmLab\bin\Debug\net10.0-android\TmLab.apk -
+rem  The APK is created in TmLab\bin\Debug\net10.0-android\com.example.tmlab-Signed.apk -
 rem  copy it to a phone (USB, messenger, cloud) and install it there.
 rem  On the phone allow installs from unknown sources for the app you use
 rem  to open the file (browser, file manager, messenger).
@@ -54,7 +54,7 @@ echo (first run restores packages - needs access to nuget.org)
 call dotnet build -f net10.0-android -c Debug
 if errorlevel 1 goto failed
 
-set "APK=bin\Debug\net10.0-android\TmLab.apk"
+set "APK=bin\Debug\net10.0-android\com.example.tmlab-Signed.apk"
 if not exist "%APK%" (
   echo [ERROR] APK not found: %APK%
   echo APK files in bin:
